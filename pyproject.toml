@@ -1,0 +1,26 @@
+[tool.poetry]
+name = "z-score-backend"
+version = "0.1.0"
+description = "Z-Score를 활용한 캠샤프트 제조 라인 불량률 예측 및 알람 시스템"
+authors = ["Your Name <you@example.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "3.12.10"
+fastapi = "^0.111.0"
+uvicorn = {extras = ["standard"], version = "^0.30.1"}
+pandas = "^2.2.2"
+numpy = "^1.26.4"
+scikit-learn = "^1.5.0"
+sqlalchemy = "^2.0.30"
+apscheduler = "^3.10.4"
+python-dotenv = "^1.0.1"
+# Oracle, MariaDB 드라이버는 필요 시 추가
+# cx_oracle = "^8.3" 
+# oracledb = "^2.2.0"
+# mysqlclient = "^2.2.4"
+# pymysql = "^1.1.1"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api" 
