@@ -20,6 +20,9 @@ python-dotenv = "^1.0.1"
 # oracledb = "^2.2.0"
 # mysqlclient = "^2.2.4"
 # pymysql = "^1.1.1"
+pydantic-settings = "^2.10.1"
+tqdm = "^4.67.1"
+pymysql = "^1.1.1"
 
 [build-system]
 requires = ["poetry-core"]

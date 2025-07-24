@@ -1,29 +1,43 @@
-# 백엔드 개발 가이드라인
-
-## 개발 환경
-
-- **Python Version:** 3.12.10
-- **Package Manager:** Poetry
-- `poetry`를 사용하여 의존성을 관리하고, `pyproject.toml` 파일에 명시된 라이브러리만 사용해야 합니다.
-
-## 데이터 파이프라인
-
-- **핵심 로직:** CSV 파일 파싱 시, 파일의 1, 2번째 줄 정보를 조합하여 116개의 커스텀 헤더를 생성하고, wide-format 데이터를 long-format으로 변환하여 DB에 저장해야 합니다.
-- **상세 구현:** [데이터 파이프라인 설계서](mdc:docs/data_pipeline.md) 참조
-
-## 예측 모델
-
-- **핵심 로직:** 아래의 2단계 접근 방식을 따라야 합니다.
-  1.  **규격 기반 불량률(PPM) 계산:** USL/LSL(-0.25/0.25) 규격을 기준으로 예상 부적합 확률을 Z-score를 통해 계산합니다.
-  2.  **불량률 추세 분석:** 계산된 예상 불량률의 시간적 변화(기울기)를 분석하여 공정의 악화/안정화 추세를 예측합니다.
-- **상세 구현:** [예측 모델 설계서](mdc:docs/prediction_model.md) 참조
-
-## 데이터베이스
-
-- **ORM:** 모든 데이터베이스 상호작용은 `SQLAlchemy`를 사용하여 Oracle과 MariaDB 호환성을 유지해야 합니다.
-- **테이블 구조:** 데이터는 `products`, `cam_measurements`, `distribution_analysis`, `alarms` 테이블에 정규화하여 저장합니다.
-- **상세 구현:** [데이터베이스 스키마 설계서](mdc:docs/database_schema.md) 참조
-
-- **상세 구현:** [데이터베이스 스키마 설계서](mdc:docs/database_schema.md) 참조
-
 ---
+alwaysApply: false
+---
+
+# Python Backend Development Guide
+
+본 문서는 프로젝트의 파이썬 백엔드 개발을 위한 핵심 규칙과 절차를 정의합니다.
+
+## 1. 핵심 기술 스택 및 환경
+
+- **언어 및 프레임워크:** Python 3.12.10, FastAPI
+- **패키지 관리:** Poetry
+- **핵심 라이브러리:** Pandas, NumPy, Scikit-learn, SQLAlchemy
+- **코드 스타일:** [Black](https://github.com/psf/black) 포맷터를 사용하여 코드 스타일을 통일합니다.
+
+## 2. 개발 순서 및 절차
+
+백엔드 개발은 다음 순서를 따릅니다. [[memory:4111132]] 상세한 내용은 각 설계 문서를 참조하십시오.
+
+1.  **데이터 파이프라인 구현:**
+
+    - `data` 폴더의 CSV를 파싱하고 정제하는 로직을 개발합니다.
+    - **참조:** [데이터 파이이프라인 설계서](mdc:docs/data_pipeline.md)
+
+2.  **데이터베이스 모델 정의:**
+
+    - `SQLAlchemy`를 사용하여 데이터베이스 스키마를 정의합니다. Oracle과 MariaDB 호환성을 유지해야 합니다.
+    - **참조:** [데이터베이스 스키마 설계서](mdc:docs/database_schema.md)
+
+3.  **예측 모델 개발 (TDD):**
+
+    - Z-score, 예상 불량률(PPM), 변화 기울기를 계산하는 핵심 로직을 테스트 주도 개발(TDD) 방식으로 구현합니다. [[memory:268055]]
+    - **참조:** [예측 모델 설계서](mdc:docs/prediction_model.md)
+
+4.  **API 엔드포인트 개발:**
+    - 정의된 명세에 따라 모든 API를 구현합니다. FastAPI의 자동 문서화 기능을 적극 활용합니다.
+    - **참조:** [API 명세서](mdc:docs/api_specification.md)
+
+## 3. 주요 규칙
+
+- **TDD:** 핵심 예측 모델 로직은 반드시 테스트 코드를 먼저 작성합니다. [[memory:268055]]
+- **DB 호환성:** 특정 DB에 종속적인 쿼리 대신 SQLAlchemy ORM을 사용합니다.
+- **문서화:** API는 FastAPI의 자동 문서(Swagger)를 통해 항상 최신 상태를 유지해야 합니다.

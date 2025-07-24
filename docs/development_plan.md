@@ -89,3 +89,17 @@ graph TD
 - **데이터베이스 호환성:** 특정 DB에 종속적인 쿼리 대신, SQLAlchemy와 같은 ORM을 사용하여 Oracle과 MariaDB 간 호환성을 확보합니다.
 - **API 명세:** FastAPI의 자동 문서 생성 기능(Swagger UI)을 적극 활용하여 API 명세를 최신으로 유지합니다.
 - **TDD:** 핵심 로직(Z-score 계산, 예측 모델)에 대해서는 테스트 코드를 먼저 작성하는 TDD(Test-Driven Development) 방식을 따릅니다. [[memory:268055]]
+- **개발 순서:** 프로젝트는 다음 순서에 따라 개발을 진행합니다. [[memory:4111132]]
+  1.  **통합 환경 구축:** Docker Compose를 사용하여 개발 환경(FastAPI, Next.js, DB)을 구성합니다.
+  2.  **백엔드 개발 (FastAPI):**
+      - 데이터 파이프라인 구현
+      - 데이터베이스 연동 및 모델 정의
+      - 예측 모델 로직 개발 (TDD)
+      - API 엔드포인트 구현
+  3.  **프론트엔드 개발 (Next.js):**
+      - 프로젝트 구조 설정 및 라이브러리 설치
+      - API 연동 및 상태 관리 (React Query)
+      - UI 컴포넌트 개발 (AG-Grid, 차트 등)
+  4.  **통합 및 배포:**
+      - 시스템 통합 테스트
+      - Docker를 이용한 최종 배포
