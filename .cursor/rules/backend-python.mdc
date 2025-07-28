@@ -1,0 +1,65 @@
+---
+alwaysApply: false
+---
+
+# Python Backend Development Guide
+
+본 문서는 프로젝트의 파이썬 백엔드 개발을 위한 핵심 규칙과 절차를 정의합니다.
+
+## 1. 핵심 기술 스택 및 환경
+
+- **언어 및 프레임워크:** Python 3.12.10, FastAPI
+- **패키지 관리:** Poetry
+- **핵심 라이브러리:** Pandas, NumPy, Scikit-learn, SQLAlchemy
+- **코드 스타일:** [Black](https://github.com/psf/black) 포맷터를 사용하여 코드 스타일을 통일합니다.
+
+## 2. 개발 순서 및 절차
+
+백엔드 개발은 다음 순서를 따릅니다. [[memory:4111132]] 상세한 내용은 각 설계 문서를 참조하십시오.
+
+1.  **데이터 파이프라인 구현:**
+
+    - `data` 폴더의 CSV를 파싱하고 정제하는 로직을 개발합니다.
+    - **참조:** [데이터 파이이프라인 설계서](mdc:docs/data_pipeline.md)
+
+2.  **데이터베이스 모델 정의:**
+
+    - `SQLAlchemy`를 사용하여 데이터베이스 스키마를 정의합니다. Oracle과 MariaDB 호환성을 유지해야 합니다.
+    - **참조:** [데이터베이스 스키마 설계서](mdc:docs/database_schema.md)
+
+3.  **예측 모델 개발 (TDD):**
+
+    - Z-score, 예상 불량률(PPM), 변화 기울기를 계산하는 핵심 로직을 테스트 주도 개발(TDD) 방식으로 구현합니다. [[memory:268055]]
+    - **참조:** [예측 모델 설계서](mdc:docs/prediction_model.md)
+
+4.  **API 엔드포인트 개발:**
+    - 정의된 명세에 따라 모든 API를 구현합니다. FastAPI의 자동 문서화 기능을 적극 활용합니다.
+    - **참조:** [API 명세서](mdc:docs/api_specification.md)
+
+## 3. 주요 규칙
+
+- **TDD:** 핵심 예측 모델 로직은 반드시 테스트 코드를 먼저 작성합니다. [[memory:268055]]
+- **DB 호환성:** 특정 DB에 종속적인 쿼리 대신 SQLAlchemy ORM을 사용합니다.
+- **문서화:** API는 FastAPI의 자동 문서(Swagger)를 통해 항상 최신 상태를 유지해야 합니다.
+
+## 데이터 파이프라인
+
+- **데이터 수집:** `scripts/load_data.py` 스크립트를 통해 원본 CSV 파일의 헤더를 제외한 데이터를 `HANDY_ZSCORE_RAW_DATA` 테이블에 직접 적재합니다.
+- **데이터 파싱 및 가공:** 데이터 파싱, 정제, 변환(wide-to-long)은 API 요청 시점에서 **애플리케이션 로직**을 통해 동적으로 수행됩니다. `HANDY_ZSCORE_COLUMN_MAPPER` 테이블을 사용하여 원본 데이터('d001', 'd002'...)를 의미 있는 이름('barcode', 'model_name'...)으로 매핑합니다.
+- **상세 구현:** [데이터 파이프라인 설계서](mdc:docs/data_pipeline.md) 참조
+
+## 데이터베이스
+
+- **ORM:** SQLAlchemy를 사용하여 데이터베이스와 상호작용합니다.
+- **기본 키 생성:** `IDENTITY` 컬럼 대신, `SEQUENCE` 객체를 생성하고 `INSERT` 시점에서 애플리케이션이 직접 `sequence.next_value()`를 호출하여 기본 키 값을 할당합니다. 트리거는 사용하지 않습니다.
+- **상세 구현:** [데이터베이스 스키마 설계서](mdc:docs/database_schema.md) 참조
+
+## API
+
+- **REST API:** 클라이언트의 초기 데이터 로드 및 특정 데이터 조회를 위한 REST API를 제공합니다.
+- **실시간 API:** `APScheduler`가 트리거하는 분석 결과를 **웹소켓/SSE**를 통해 프론트엔드에 실시간으로 푸시해야 합니다. `/api/stream` 엔드포인트를 구현하고, `new_analysis`, `new_alarm` 이벤트를 전송해야 합니다.
+- **상세 구현:** [API 명세서](mdc:docs/api_specification.md) 참조
+- **DB 호환성:** 특정 DB에 종속적인 쿼리 대신 SQLAlchemy ORM을 사용합니다.
+
+- **DB 호환성:** 특정 DB에 종속적인 쿼리 대신 SQLAlchemy ORM을 사용합니다.
+- **문서화:** API는 FastAPI의 자동 문서(Swagger)를 통해 항상 최신 상태를 유지해야 합니다.
