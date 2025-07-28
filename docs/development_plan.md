@@ -31,32 +31,44 @@
 - **Deployment:**
   - Docker Compose
 
-## 4. 시스템 아키텍처
+### 4.2. 아키텍처 설계
 
 ```mermaid
 graph TD
-    A[CSV Files in /data] --> B{데이터 처리<br/>(Python/Pandas)};
-    B --> G{Z-score 계산 및<br/>분포 분석};
-    G --> C[데이터베이스<br/>(Oracle/MariaDB)];
-    C --> D[Backend API<br/>(FastAPI)];
-    D --> E[Frontend<br/>(Next.js)];
-    E --> F[사용자<br/>(웹 브라우저)];
-
-    subgraph "데이터 수집 및 처리"
-        A
-        B
-        G
+    subgraph "1. 데이터 수집 (Batch)"
+        A[CSV Files] -- "python scripts/load_data.py" --> B([HANDY_ZSCORE_RAW_DATA]);
     end
 
-    subgraph "데이터 저장"
-        C
+    subgraph "2. 백엔드 실시간 처리 (FastAPI)"
+        subgraph "Polling & ETL"
+            C(APScheduler) -- "1. 주기적 폴링" --> B;
+            C -- "2. 신규 데이터 감지 시<br>작업 트리거" --> D{ETL & 분석 파이p라인};
+            D -- "3. 원본 데이터 조회" --> B;
+            D -- "4. 컬럼명 조회" --> E([HANDY_ZSCORE_COLUMN_MAPPER]);
+            D -- "5. 데이터 변환/분석" --> F([products,<br>cam_measurements,<br>distribution_analysis,<br>alarms]);
+        end
+
+        subgraph "API & Push"
+            G[REST API] -- "데이터 조회" --> F;
+            G -- "응답" --> H[Frontend];
+            F -- "6. 새로운 분석/알람 발생" --> I(WebSocket / SSE);
+            I -- "7. 실시간 푸시" --> H;
+        end
     end
 
-    subgraph "서비스 제공"
-        D
-        E
+    subgraph "3. 프론트엔드"
+        H -- "대시보드 렌더링" --> J(사용자);
     end
 ```
+
+- **데이터베이스:** `SQLAlchemy` ORM을 사용하여 Oracle과 MariaDB 호환성을 확보합니다. PK는 `SEQUENCE`를 직접 호출하여 관리합니다.
+- **데이터 파이프라인:** `scripts/load_data.py`를 통해 원본 데이터를 `HANDY_ZSCORE_RAW_DATA` 테이블에 1차 적재합니다.
+- **실시간 처리 파이프라인 (ETL & Analysis):**
+  - **주기적 데이터 감지 (Polling):** FastAPI 백엔드에서 `APScheduler`가 주기적으로 원본 데이터 테이블의 변경 사항을 감지합니다.
+  - **데이터 변환 및 분석:** 새로운 데이터가 감지되면, `HANDY_ZSCORE_COLUMN_MAPPER`를 이용해 정규화된 데이터(`products`, `cam_measurements`)로 변환하고, 즉시 Z-score, 예상 불량률(PPM) 등을 계산하여 `distribution_analysis` 테이블에 저장합니다.
+- **실시간 데이터 전송 (Push):**
+  - **웹소켓 / SSE:** 새로운 분석 결과나 알람이 생성되면, FastAPI는 웹소켓(WebSocket) 또는 서버-센트 이벤트(Server-Sent Events)를 통해 연결된 모든 프론트엔드 클라이언트에 실시간으로 데이터를 푸시합니다.
+- **예측 모델:** Z-score, 예상 불량률(PPM), 불량률 변화 기울기 분석을 통해 공정 이상 징후를 예측합니다.
 
 ## 5. 개발 단계 및 절차
 

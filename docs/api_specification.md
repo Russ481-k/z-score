@@ -164,3 +164,40 @@
     "message": null
   }
   ```
+
+## 4. 실시간 데이터 스트리밍 API (WebSocket / SSE)
+
+### `GET /api/stream`
+
+- **설명:** 실시간 공정 분석 결과 및 알람 데이터를 스트리밍으로 수신하는 엔드포인트입니다. 프론트엔드는 이 엔드포인트에 한 번 연결하여 지속적으로 데이터를 푸시받습니다.
+- **프로토콜:** 웹소켓(WebSocket) 또는 서버-센트 이벤트(SSE)
+- **전송되는 데이터 포맷:**
+  - **타입 1: 새로운 분석 결과 (`new_analysis`)**
+    ```json
+    {
+      "event": "new_analysis",
+      "payload": {
+        "analyzed_at": "2024-07-28T10:20:00",
+        "cam_number": 3,
+        "metric": "torque",
+        "mean": 0.021,
+        "std_dev": 0.095,
+        "predicted_ppm": 310.4,
+        "ppm_slope": 18.1
+      }
+    }
+    ```
+  - **타입 2: 새로운 알람 (`new_alarm`)**
+    ```json
+    {
+      "event": "new_alarm",
+      "payload": {
+        "alarm_id": 2,
+        "timestamp": "2024-07-28T10:20:00",
+        "cam_number": 3,
+        "metric": "torque",
+        "alarm_type": "slope_warning",
+        "message": "CAM 3의 불량률 기울기(18.1)가 경고 임계값을 초과했습니다. 공정 악화가 예상됩니다."
+      }
+    }
+    ```
