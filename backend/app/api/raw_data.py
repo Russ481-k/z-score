@@ -233,6 +233,12 @@ def update_column_mapper(
         mapper.raw_column_name = mapper_data.raw_column_name
     if mapper_data.mapped_column_name is not None:
         mapper.mapped_column_name = mapper_data.mapped_column_name
+    if mapper_data.description is not None:
+        mapper.description = mapper_data.description
+    if mapper_data.display_order is not None:
+        mapper.display_order = mapper_data.display_order
+    if mapper_data.is_active is not None:
+        mapper.is_active = mapper_data.is_active
     
     db.commit()
     db.refresh(mapper)

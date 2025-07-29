@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { AgGridReact } from "ag-grid-react";
 import { ModuleRegistry, AllCommunityModule } from "ag-grid-community";
 import "ag-grid-community/styles/ag-theme-quartz.css";
@@ -138,23 +138,45 @@ const ColumnMapperGrid: React.FC = () => {
 
   // 활성화 토글 렌더러
   const ActiveToggleRenderer = (params: ICellRendererParams) => {
+    const [isChecked, setIsChecked] = useState(params.value);
+
+    // params.value가 변경될 때 로컬 상태 업데이트
+    useEffect(() => {
+      setIsChecked(params.value);
+    }, [params.value]);
+
+    const handleToggle = (checked: boolean) => {
+      setIsChecked(checked); // 즉시 UI 반영
+      toggleActiveMutation.mutate({
+        id: params.data.id,
+        is_active: checked,
+      });
+    };
+
     return (
-      <label style={{ display: "flex", alignItems: "center", height: "100%" }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          height: "100%",
+        }}
+      >
         <input
           type="checkbox"
-          checked={params.value}
-          onChange={(e) => {
-            toggleActiveMutation.mutate({
-              id: params.data.id,
-              is_active: e.target.checked,
-            });
+          checked={isChecked}
+          onChange={(e) => handleToggle(e.target.checked)}
+          disabled={toggleActiveMutation.isPending}
+          style={{
+            width: "16px",
+            height: "16px",
+            accentColor: isChecked ? "#4CAF50" : "#666",
+            cursor: "pointer",
+            alignItems: "center",
+            justifyContent: "center",
           }}
-          style={{ marginRight: "5px" }}
         />
-        <span style={{ color: params.value ? "#4CAF50" : "#666" }}>
-          {params.value ? "활성" : "비활성"}
-        </span>
-      </label>
+      </div>
     );
   };
 
@@ -164,7 +186,14 @@ const ColumnMapperGrid: React.FC = () => {
 
     if (isEditing) {
       return (
-        <div style={{ display: "flex", gap: "5px" }}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            height: "100%",
+          }}
+        >
           <button
             onClick={() => {
               updateMutation.mutate({
@@ -177,51 +206,27 @@ const ColumnMapperGrid: React.FC = () => {
                 },
               });
             }}
-            style={{
-              padding: "4px 8px",
-              backgroundColor: "#4CAF50",
-              color: "#fff",
-              border: "none",
-              borderRadius: "3px",
-              cursor: "pointer",
-              fontSize: "12px",
-            }}
+            className="action-btn save-btn"
           >
-            저장
+            ✓
           </button>
           <button
             onClick={() => setEditingId(null)}
-            style={{
-              padding: "4px 8px",
-              backgroundColor: "#666",
-              color: "#fff",
-              border: "none",
-              borderRadius: "3px",
-              cursor: "pointer",
-              fontSize: "12px",
-            }}
+            className="action-btn cancel-btn"
           >
-            취소
+            ✕
           </button>
         </div>
       );
     }
 
     return (
-      <div style={{ display: "flex", gap: "5px" }}>
+      <div style={{ display: "flex", gap: "8px" }}>
         <button
           onClick={() => setEditingId(params.data.id)}
-          style={{
-            padding: "4px 8px",
-            backgroundColor: "#2196F3",
-            color: "#fff",
-            border: "none",
-            borderRadius: "3px",
-            cursor: "pointer",
-            fontSize: "12px",
-          }}
+          className="action-btn edit-btn"
         >
-          수정
+          ✎
         </button>
         <button
           onClick={() => {
@@ -229,17 +234,9 @@ const ColumnMapperGrid: React.FC = () => {
               deleteMutation.mutate(params.data.id);
             }
           }}
-          style={{
-            padding: "4px 8px",
-            backgroundColor: "#f44336",
-            color: "#fff",
-            border: "none",
-            borderRadius: "3px",
-            cursor: "pointer",
-            fontSize: "12px",
-          }}
+          className="action-btn delete-btn"
         >
-          삭제
+          ✕
         </button>
       </div>
     );
@@ -259,14 +256,7 @@ const ColumnMapperGrid: React.FC = () => {
             onChange={(e) => {
               params.data[field] = Number(e.target.value);
             }}
-            style={{
-              width: "100%",
-              height: "100%",
-              border: "1px solid #333",
-              backgroundColor: "#1a1a1a",
-              color: "#ededed",
-              padding: "2px",
-            }}
+            className="edit-input number-input"
           />
         );
       } else {
@@ -277,14 +267,7 @@ const ColumnMapperGrid: React.FC = () => {
             onChange={(e) => {
               params.data[field] = e.target.value;
             }}
-            style={{
-              width: "100%",
-              height: "100%",
-              border: "1px solid #333",
-              backgroundColor: "#1a1a1a",
-              color: "#ededed",
-              padding: "2px",
-            }}
+            className="edit-input"
           />
         );
       }
@@ -315,19 +298,19 @@ const ColumnMapperGrid: React.FC = () => {
       },
       {
         field: "display_order",
-        headerName: "표시순서",
-        width: 100,
+        headerName: "순서",
+        width: 80,
         cellRenderer: EditableCellRenderer,
       },
       {
         field: "is_active",
-        headerName: "활성화",
-        width: 100,
+        headerName: "활성",
+        width: 80,
         cellRenderer: ActiveToggleRenderer,
       },
       {
         headerName: "액션",
-        width: 150,
+        width: 120,
         cellRenderer: ActionCellRenderer,
         sortable: false,
         filter: false,
@@ -354,70 +337,341 @@ const ColumnMapperGrid: React.FC = () => {
     }
   };
 
-  if (isLoading) return <div>로딩 중...</div>;
-  if (error) return <div>오류가 발생했습니다.</div>;
+  if (isLoading)
+    return (
+      <div className="loading-container">
+        <div className="loading-spinner"></div>
+        <span>컬럼 매퍼를 불러오는 중...</span>
+      </div>
+    );
+
+  if (error)
+    return (
+      <div className="error-container">
+        <span>⚠ 데이터를 불러오는 중 오류가 발생했습니다.</span>
+      </div>
+    );
 
   return (
-    <div style={{ padding: "20px" }}>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: "20px",
-        }}
-      >
-        <h2>컬럼 매퍼 관리</h2>
-        <div style={{ display: "flex", gap: "10px" }}>
+    <div className="column-mapper-container">
+      <style jsx>{`
+        .column-mapper-container {
+          background: transparent;
+          border-radius: 12px;
+          overflow: hidden;
+        }
+
+        .header-card {
+          background: rgba(255, 255, 255, 0.03);
+          backdrop-filter: blur(20px);
+          border: 1px solid rgba(255, 255, 255, 0.06);
+          border-radius: 12px;
+          padding: 20px;
+          margin-bottom: 20px;
+          box-shadow: 0 2px 16px rgba(0, 0, 0, 0.2);
+        }
+
+        .header-title {
+          font-size: 24px;
+          font-weight: 600;
+          color: #ffffff;
+          margin: 0;
+          margin-bottom: 16px;
+        }
+
+        .header-controls {
+          display: flex;
+          gap: 10px;
+          flex-wrap: wrap;
+        }
+
+        .modern-btn {
+          padding: 10px 18px;
+          border: none;
+          border-radius: 8px;
+          font-weight: 500;
+          font-size: 13px;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          position: relative;
+          overflow: hidden;
+        }
+
+        .modern-btn:hover {
+          transform: translateY(-1px);
+        }
+
+        .modern-btn:active {
+          transform: translateY(0);
+        }
+
+        .primary-btn {
+          background: rgba(255, 255, 255, 0.08);
+          color: white;
+          border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .primary-btn:hover {
+          background: rgba(255, 255, 255, 0.12);
+        }
+
+        .warning-btn {
+          background: rgba(255, 255, 255, 0.06);
+          color: #ccc;
+          border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .warning-btn:hover {
+          background: rgba(255, 255, 255, 0.1);
+          color: #fff;
+        }
+
+        .add-form-card {
+          background: rgba(255, 255, 255, 0.03);
+          backdrop-filter: blur(20px);
+          border: 1px solid rgba(255, 255, 255, 0.06);
+          border-radius: 12px;
+          padding: 20px;
+          margin-bottom: 20px;
+          box-shadow: 0 2px 16px rgba(0, 0, 0, 0.2);
+        }
+
+        .form-title {
+          font-size: 18px;
+          font-weight: 600;
+          color: #ffffff;
+          margin-bottom: 16px;
+        }
+
+        .form-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+          gap: 12px;
+          margin-bottom: 16px;
+        }
+
+        .form-input {
+          padding: 10px 14px;
+          background: rgba(255, 255, 255, 0.04);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          border-radius: 6px;
+          color: #e0e0e0;
+          font-size: 13px;
+          transition: all 0.2s ease;
+        }
+
+        .form-input:focus {
+          outline: none;
+          border-color: rgba(255, 255, 255, 0.2);
+          background: rgba(255, 255, 255, 0.06);
+        }
+
+        .form-input::placeholder {
+          color: #888;
+        }
+
+        .checkbox-group {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding: 10px 14px;
+          background: rgba(255, 255, 255, 0.04);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          border-radius: 6px;
+        }
+
+        .stats-card {
+          background: rgba(255, 255, 255, 0.03);
+          backdrop-filter: blur(20px);
+          border: 1px solid rgba(255, 255, 255, 0.06);
+          border-radius: 12px;
+          padding: 16px;
+          margin-bottom: 20px;
+          display: flex;
+          gap: 16px;
+          flex-wrap: wrap;
+        }
+
+        .stat-item {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          padding: 6px 12px;
+          background: rgba(255, 255, 255, 0.05);
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          border-radius: 16px;
+          font-size: 13px;
+          font-weight: 500;
+          color: #ccc;
+        }
+
+        .grid-card {
+          background: rgba(255, 255, 255, 0.02);
+          backdrop-filter: blur(20px);
+          border: 1px solid rgba(255, 255, 255, 0.06);
+          border-radius: 12px;
+          padding: 20px;
+          box-shadow: 0 2px 16px rgba(0, 0, 0, 0.2);
+          transition: all 0.3s ease;
+        }
+
+        .grid-card:hover {
+          transform: translateY(-1px);
+          box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+        }
+
+        .grid-wrapper {
+          border-radius: 8px;
+          overflow: hidden;
+          box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        :global(.action-btn) {
+          padding: 4px 6px;
+          border: none;
+          border-radius: 4px;
+          font-size: 11px;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          min-width: 28px;
+          height: 28px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        :global(.save-btn) {
+          background: rgba(255, 255, 255, 0.1);
+          color: white;
+          border: 1px solid rgba(255, 255, 255, 0.15);
+        }
+
+        :global(.save-btn:hover) {
+          background: rgba(255, 255, 255, 0.15);
+        }
+
+        :global(.cancel-btn) {
+          background: rgba(255, 255, 255, 0.05);
+          color: #ccc;
+          border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        :global(.cancel-btn:hover) {
+          background: rgba(255, 255, 255, 0.1);
+        }
+
+        :global(.edit-btn) {
+          background: rgba(255, 255, 255, 0.08);
+          color: white;
+          border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        :global(.edit-btn:hover) {
+          background: rgba(255, 255, 255, 0.12);
+        }
+
+        :global(.delete-btn) {
+          background: rgba(255, 255, 255, 0.06);
+          color: #ccc;
+          border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        :global(.delete-btn:hover) {
+          background: rgba(255, 255, 255, 0.1);
+          color: #fff;
+        }
+
+        :global(.edit-input) {
+          width: 100%;
+          height: 100%;
+          border: 1px solid rgba(255, 255, 255, 0.2);
+          background: rgba(255, 255, 255, 0.08);
+          color: #e0e0e0;
+          padding: 3px 6px;
+          border-radius: 3px;
+          font-size: 11px;
+        }
+
+        :global(.edit-input:focus) {
+          outline: none;
+          border-color: rgba(255, 255, 255, 0.3);
+          background: rgba(255, 255, 255, 0.12);
+        }
+
+        .loading-container,
+        .error-container {
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          height: 400px;
+          color: #888;
+          font-size: 14px;
+          font-weight: 500;
+          gap: 10px;
+        }
+
+        .loading-spinner {
+          width: 24px;
+          height: 24px;
+          border: 2px solid rgba(255, 255, 255, 0.1);
+          border-top: 2px solid #666;
+          border-radius: 50%;
+          animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+          0% {
+            transform: rotate(0deg);
+          }
+          100% {
+            transform: rotate(360deg);
+          }
+        }
+
+        @media (max-width: 768px) {
+          .header-controls {
+            flex-direction: column;
+          }
+
+          .form-grid {
+            grid-template-columns: 1fr;
+          }
+
+          .stats-card {
+            flex-direction: column;
+          }
+        }
+      `}</style>
+
+      <div className="header-card">
+        <h1 className="header-title">컬럼 매퍼 관리</h1>
+        <div className="header-controls">
           <button
             onClick={handleInitializeAll}
             disabled={initializeAllMutation.isPending}
-            style={{
-              padding: "10px 15px",
-              backgroundColor: "#FF9800",
-              color: "#fff",
-              border: "none",
-              borderRadius: "4px",
-              cursor: "pointer",
-            }}
+            className="modern-btn warning-btn"
           >
+            ↻{" "}
             {initializeAllMutation.isPending
               ? "초기화 중..."
               : "전체 컬럼 초기화"}
           </button>
           <button
             onClick={() => setIsAddMode(!isAddMode)}
-            style={{
-              padding: "10px 15px",
-              backgroundColor: "#4CAF50",
-              color: "#fff",
-              border: "none",
-              borderRadius: "4px",
-              cursor: "pointer",
-            }}
+            className="modern-btn primary-btn"
           >
-            {isAddMode ? "취소" : "새 매핑 추가"}
+            {isAddMode ? "✕ 취소" : "+ 새 매핑 추가"}
           </button>
         </div>
       </div>
 
       {isAddMode && (
-        <div
-          style={{
-            marginBottom: "20px",
-            padding: "15px",
-            backgroundColor: "#2a2a2a",
-            borderRadius: "5px",
-          }}
-        >
-          <h3 style={{ marginBottom: "15px" }}>새 컬럼 매핑 추가</h3>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(5, 1fr)",
-              gap: "10px",
-            }}
-          >
+        <div className="add-form-card">
+          <h3 className="form-title">새 컬럼 매핑 추가</h3>
+          <div className="form-grid">
             <input
               type="text"
               placeholder="원본 컬럼명 (예: d001)"
@@ -425,13 +679,7 @@ const ColumnMapperGrid: React.FC = () => {
               onChange={(e) =>
                 setNewMapper({ ...newMapper, raw_column_name: e.target.value })
               }
-              style={{
-                padding: "8px",
-                border: "1px solid #333",
-                borderRadius: "4px",
-                backgroundColor: "#1a1a1a",
-                color: "#ededed",
-              }}
+              className="form-input"
             />
             <input
               type="text"
@@ -443,13 +691,7 @@ const ColumnMapperGrid: React.FC = () => {
                   mapped_column_name: e.target.value,
                 })
               }
-              style={{
-                padding: "8px",
-                border: "1px solid #333",
-                borderRadius: "4px",
-                backgroundColor: "#1a1a1a",
-                color: "#ededed",
-              }}
+              className="form-input"
             />
             <input
               type="text"
@@ -458,13 +700,7 @@ const ColumnMapperGrid: React.FC = () => {
               onChange={(e) =>
                 setNewMapper({ ...newMapper, description: e.target.value })
               }
-              style={{
-                padding: "8px",
-                border: "1px solid #333",
-                borderRadius: "4px",
-                backgroundColor: "#1a1a1a",
-                color: "#ededed",
-              }}
+              className="form-input"
             />
             <input
               type="number"
@@ -476,79 +712,79 @@ const ColumnMapperGrid: React.FC = () => {
                   display_order: Number(e.target.value),
                 })
               }
-              style={{
-                padding: "8px",
-                border: "1px solid #333",
-                borderRadius: "4px",
-                backgroundColor: "#1a1a1a",
-                color: "#ededed",
-              }}
+              className="form-input"
             />
-            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-              <label style={{ color: "#ededed" }}>
+            <div className="checkbox-group">
+              <label style={{ color: "#e0e0e0", cursor: "pointer" }}>
                 <input
                   type="checkbox"
                   checked={newMapper.is_active || false}
                   onChange={(e) =>
                     setNewMapper({ ...newMapper, is_active: e.target.checked })
                   }
-                  style={{ marginRight: "5px" }}
+                  style={{ marginRight: "6px" }}
                 />
                 활성화
               </label>
             </div>
           </div>
-          <div style={{ marginTop: "15px" }}>
-            <button
-              onClick={handleAddMapper}
-              disabled={createMutation.isPending}
-              style={{
-                padding: "10px 20px",
-                backgroundColor: "#4CAF50",
-                color: "#fff",
-                border: "none",
-                borderRadius: "4px",
-                cursor: "pointer",
-                marginRight: "10px",
-              }}
-            >
-              {createMutation.isPending ? "추가 중..." : "추가"}
-            </button>
-          </div>
+          <button
+            onClick={handleAddMapper}
+            disabled={createMutation.isPending}
+            className="modern-btn primary-btn"
+          >
+            {createMutation.isPending ? "추가 중..." : "+ 추가"}
+          </button>
         </div>
       )}
 
-      <div
-        style={{
-          marginBottom: "10px",
-          color: "#ededed",
-          fontSize: "14px",
-        }}
-      >
-        총 {data?.total || 0}개의 컬럼 매핑
-        {" · "}
-        활성화된 컬럼:{" "}
-        {data?.items?.filter((item: ColumnMapper) => item.is_active).length ||
-          0}
-        개
+      <div className="stats-card">
+        <div className="stat-item">
+          <span>▤</span>
+          <span>총 {data?.total || 0}개의 컬럼 매핑</span>
+        </div>
+        <div className="stat-item">
+          <span>●</span>
+          <span>
+            활성화된 컬럼:{" "}
+            {data?.items?.filter((item: ColumnMapper) => item.is_active)
+              .length || 0}
+            개
+          </span>
+        </div>
+        <div className="stat-item">
+          <span>○</span>
+          <span>
+            비활성화된 컬럼:{" "}
+            {data?.items?.filter((item: ColumnMapper) => !item.is_active)
+              .length || 0}
+            개
+          </span>
+        </div>
       </div>
 
-      <div
-        className="ag-theme-alpine-dark"
-        style={{ height: "600px", width: "100%" }}
-      >
-        <AgGridReact
-          columnDefs={colDefs}
-          rowData={data?.items || []}
-          defaultColDef={{
-            resizable: true,
-            sortable: true,
-            filter: true,
-          }}
-          rowSelection={{ mode: "multiRow" }}
-          animateRows={true}
-          suppressClickEdit={true}
-        />
+      <div className="grid-card">
+        <div className="grid-wrapper">
+          <div
+            className="ag-theme-alpine-dark"
+            style={{ height: "600px", width: "100%" }}
+          >
+            <AgGridReact
+              columnDefs={colDefs}
+              rowData={data?.items || []}
+              defaultColDef={{
+                resizable: true,
+                sortable: true,
+                filter: true,
+              }}
+              rowSelection={{ mode: "multiRow" }}
+              animateRows={true}
+              suppressClickEdit={true}
+              suppressCellFocus={true}
+              getRowId={(params) => params.data.id.toString()}
+            />
+          </div>
+        </div>
       </div>
     </div>
   );
