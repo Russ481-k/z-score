@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime
+from sqlalchemy import Column, Integer, String, DateTime, Boolean
 from sqlalchemy.sql import func
 from ..core.database import Base
 
@@ -9,6 +9,8 @@ class HandyColumnMapper(Base):
     raw_column_name = Column(String)
     mapped_column_name = Column(String)
     description = Column(String)
+    display_order = Column(Integer, default=0)  # 표시 순서
+    is_active = Column(Boolean, default=True)   # 활성화 상태
     create_time = Column(DateTime, server_default=func.now())
 
 class HandyRawData(Base):

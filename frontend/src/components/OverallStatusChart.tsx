@@ -20,12 +20,28 @@ interface OverallStatusChartProps {
 const OverallStatusChart = memo(function OverallStatusChart({
   onSliceClick,
 }: OverallStatusChartProps) {
-  const { data } = useProducts("", "", 1, 1000); // size를 1000으로 통일
+  const { data } = useProducts({
+    startDate: "",
+    endDate: "",
+    page: 1,
+    size: 1000,
+  });
 
   const statusData = useMemo(() => {
-    if (!data) return [];
-    const okCount = data?.items.filter((p) => p.result === "OK").length || 0;
-    const ngCount = data?.items.filter((p) => p.result === "NG").length || 0;
+    if (!data?.items) return [];
+
+    // 임시로 바코드 기반으로 OK/NG 결정 (실제로는 측정 데이터 기반으로 판정)
+    const okCount =
+      data.items.filter(
+        (p) =>
+          p.barcode &&
+          (p.barcode.endsWith("1C") ||
+            p.barcode.endsWith("2C") ||
+            p.barcode.endsWith("4C") ||
+            p.barcode.endsWith("5C"))
+      )?.length ?? 0;
+    const ngCount = data.items?.length ?? 0 - okCount;
+
     return [
       { name: "OK", value: okCount },
       { name: "NG", value: ngCount },

@@ -10,7 +10,7 @@ export interface Measurement {
 
 const fetchMeasurements = async (productId: number): Promise<Measurement[]> => {
   const { data } = await axios.get(
-    `/api/data/products/${productId}/measurements`
+    `http://localhost:8000/api/data/products/${productId}/measurements`
   );
   return data.data;
 };

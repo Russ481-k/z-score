@@ -32,7 +32,10 @@ class ProductBase(BaseModel):
     barcode: str
     model_name: Optional[str] = None
     line_info: Optional[str] = None
-    timestamp: datetime
+    final_position: Optional[float] = None
+    final_press_force: Optional[float] = None
+    result: Optional[str] = None
+    created_at: datetime
 
 class ProductCreate(ProductBase):
     pass

@@ -24,7 +24,45 @@ const PpmChart = memo(function PpmChart() {
   const queryClient = useQueryClient();
   const [metric, setMetric] = useState<"angle" | "torque">("angle");
   const [camNumber, setCamNumber] = useState(1);
-  const { data } = useChartData("", "", metric, camNumber);
+  // 각 CAM별 데이터 조회
+  const { data: angleData1 } = useChartData({
+    startDate: "",
+    endDate: "",
+    metric: "angle",
+    camNumber: 1,
+  });
+  const { data: torqueData1 } = useChartData({
+    startDate: "",
+    endDate: "",
+    metric: "torque",
+    camNumber: 1,
+  });
+
+  const { data: angleData4 } = useChartData({
+    startDate: "",
+    endDate: "",
+    metric: "angle",
+    camNumber: 4,
+  });
+  const { data: torqueData4 } = useChartData({
+    startDate: "",
+    endDate: "",
+    metric: "torque",
+    camNumber: 4,
+  });
+
+  const { data: angleData8 } = useChartData({
+    startDate: "",
+    endDate: "",
+    metric: "angle",
+    camNumber: 8,
+  });
+  const { data: torqueData8 } = useChartData({
+    startDate: "",
+    endDate: "",
+    metric: "torque",
+    camNumber: 8,
+  });
 
   useEffect(() => {
     const handleAnalysisUpdate = (newPoint: ChartDataPoint) => {
@@ -34,7 +72,7 @@ const PpmChart = memo(function PpmChart() {
           if (!oldData) return [newPoint];
           // 데이터가 너무 많아지지 않도록 100개로 제한
           const newData = [...oldData, newPoint];
-          return newData.slice(-100);
+          return newData?.slice(-100);
         }
       );
     };
@@ -45,6 +83,35 @@ const PpmChart = memo(function PpmChart() {
       socket.off("analysis_updated", handleAnalysisUpdate);
     };
   }, [queryClient, metric, camNumber]);
+
+  // 현재 선택된 메트릭과 CAM에 따라 데이터 선택
+  const getCurrentData = () => {
+    if (metric === "angle") {
+      switch (camNumber) {
+        case 1:
+          return Array.isArray(angleData1) ? angleData1 : [];
+        case 4:
+          return Array.isArray(angleData4) ? angleData4 : [];
+        case 8:
+          return Array.isArray(angleData8) ? angleData8 : [];
+        default:
+          return Array.isArray(angleData1) ? angleData1 : [];
+      }
+    } else {
+      switch (camNumber) {
+        case 1:
+          return Array.isArray(torqueData1) ? torqueData1 : [];
+        case 4:
+          return Array.isArray(torqueData4) ? torqueData4 : [];
+        case 8:
+          return Array.isArray(torqueData8) ? torqueData8 : [];
+        default:
+          return Array.isArray(torqueData1) ? torqueData1 : [];
+      }
+    }
+  };
+
+  const currentData = getCurrentData();
 
   return (
     <div>
@@ -71,7 +138,7 @@ const PpmChart = memo(function PpmChart() {
         </select>
       </div>
       <ResponsiveContainer width="100%" height={400}>
-        <LineChart data={data}>
+        <LineChart data={currentData}>
           <CartesianGrid strokeDasharray="3 3" />
           <XAxis
             dataKey="analyzed_at"

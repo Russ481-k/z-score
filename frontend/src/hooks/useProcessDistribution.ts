@@ -1,26 +1,26 @@
 import { useQuery } from "@tanstack/react-query";
-import axios from "axios";
+import { apiClient } from "@/lib/api";
 
-export interface DistributionDataPoint {
+export interface ProcessDistribution {
   cam_number: string;
   mean: number;
   std_dev: number;
 }
 
 const fetchProcessDistribution = async (
-  metric: "angle" | "torque"
-): Promise<DistributionDataPoint[]> => {
-  const { data } = await axios.get("/api/analysis/distribution", {
+  metric: string
+): Promise<ProcessDistribution[]> => {
+  const response = await apiClient.get("/analysis/distribution", {
     params: { metric },
   });
-  return data.data;
+  return response.data;
 };
 
-export const useProcessDistribution = (metric: "angle" | "torque") => {
-  return useQuery<DistributionDataPoint[]>({
+export const useProcessDistribution = (metric: string) => {
+  return useQuery({
     queryKey: ["distribution", metric],
     queryFn: () => fetchProcessDistribution(metric),
-    // 실시간 업데이트를 위해 initialData를 사용하지 않고, staleTime을 짧게 설정할 수 있습니다.
-    // 하지만 지금은 시뮬레이션에서 직접 캐시를 업데이트하므로 추가 설정은 불필요합니다.
+    staleTime: 30000, // 30초 동안 fresh 상태 유지
+    refetchInterval: 10000, // 10초마다 백그라운드에서 refetch
   });
 };

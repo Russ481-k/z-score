@@ -23,43 +23,60 @@ interface GridProps {
 
 const Grid = memo(function Grid({ onRowSelected, filter }: GridProps) {
   const queryClient = useQueryClient();
-  const { data } = useProducts("", "", 1, 1000); // size를 1000으로 통일
+  const { data: productsData, isLoading } = useProducts({
+    startDate: "",
+    endDate: "",
+    page: 1,
+    size: 1000,
+  });
   const [highlightedRowId, setHighlightedRowId] = useState<number | null>(null);
   const prevFirstRowId = useRef<number | null>(null);
 
   const filteredData = useMemo(() => {
-    const allItems = data?.items || [];
-    const filtered =
-      filter === "all"
-        ? allItems
-        : allItems.filter((item) => item.result === filter);
-    return filtered.slice(0, 11); // 항상 최신 8개의 데이터만 표시
-  }, [data, filter]);
+    const allItems = productsData?.items || [];
+    if (filter === "all") {
+      return allItems.slice(0, 11);
+    }
+
+    // 임시로 바코드 기반 필터링 (실제로는 측정 데이터 기반)
+    const filtered = allItems.filter((item) => {
+      const isOK =
+        item.barcode &&
+        (item.barcode.endsWith("1C") ||
+          item.barcode.endsWith("2C") ||
+          item.barcode.endsWith("4C") ||
+          item.barcode.endsWith("5C"));
+      return filter === "OK" ? isOK : !isOK;
+    });
+
+    return filtered.slice(0, 11); // 항상 최신 11개의 데이터만 표시
+  }, [productsData, filter]);
 
   useEffect(() => {
-    if (data && data.items.length > 0) {
-      const currentFirstRowId = data.items[0].id;
+    if (productsData?.items?.length && productsData.items.length > 0) {
+      const currentFirstRowId = productsData.items[0].id;
       if (
         prevFirstRowId.current !== null &&
         prevFirstRowId.current !== currentFirstRowId
       ) {
         setHighlightedRowId(currentFirstRowId);
-        setTimeout(() => {
-          setHighlightedRowId(null);
-        }, 1000);
+        setTimeout(() => setHighlightedRowId(null), 1000); // 1초 후 하이라이트 제거
       }
       prevFirstRowId.current = currentFirstRowId;
     }
-  }, [data]);
+  }, [productsData]);
 
   const [colDefs] = useState<ColDef[]>([
     { field: "barcode", headerName: "Barcode", filter: true },
     { field: "model_name", headerName: "Model" },
     { field: "line_info", headerName: "Line" },
-    { field: "final_position", headerName: "Position" },
-    { field: "final_press_force", headerName: "Press Force" },
-    { field: "result", headerName: "Result" },
-    { field: "created_at", headerName: "Timestamp" },
+    {
+      field: "timestamp",
+      headerName: "Production Time",
+      valueFormatter: (params) => {
+        return new Date(params.value).toLocaleString();
+      },
+    },
   ]);
 
   const handleRowClick = (event: RowClickedEvent<Product>) => {
@@ -83,7 +100,7 @@ const Grid = memo(function Grid({ onRowSelected, filter }: GridProps) {
       <AgGridReact
         rowData={filteredData || []}
         columnDefs={colDefs}
-        rowSelection={"single"}
+        rowSelection={{ mode: "singleRow" }}
         onRowClicked={handleRowClick}
         getRowClass={getRowClass}
         getRowId={getRowId}

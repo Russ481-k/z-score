@@ -19,10 +19,10 @@ class Product(Base):
     __tablename__ = "HANDY_PRODUCTS"
     
     id = Column(Integer, Sequence("HANDY_PRODUCTS_SEQ"), primary_key=True)
-    barcode = Column(String(255), unique=True, index=True, nullable=False)
-    model_name = Column(String(255), index=True)
-    line_info = Column(String(255))
-    timestamp = Column(DateTime, nullable=False)
+    barcode = Column(String(510), unique=True, index=True, nullable=False)  # VARCHAR2(510)
+    model_name = Column(String(510), index=True)  # VARCHAR2(510)
+    line_info = Column(String(510))  # VARCHAR2(510)
+    timestamp = Column(DateTime, nullable=False)  # 실제 컬럼명은 TIMESTAMP
     create_time = Column(DateTime, server_default=func.now())
 
     measurements = relationship("CamMeasurement", back_populates="product")
@@ -35,11 +35,11 @@ class CamMeasurement(Base):
     product_id = Column(Integer, ForeignKey("HANDY_PRODUCTS.id"), nullable=False)
     cam_number = Column(Integer, nullable=False)
     
-    # 측정 항목들
+    # 측정 항목들 (실제 Oracle 구조에 맞춤)
     press_force_max = Column(Float)
     press_force_final = Column(Float)
-    torque_value = Column(Float) # 'torque'는 예약어일 수 있어 'torque_value'로 변경
-    angle_value = Column(Float)  # 'angle'은 예약어일 수 있어 'angle_value'로 변경
+    torque_value = Column(Float)
+    angle_value = Column(Float)
     allowance = Column(Float)
     
     # Z-Score
@@ -58,7 +58,7 @@ class DistributionAnalysis(Base):
     id = Column(Integer, Sequence("HANDY_DISTR_ANALYSIS_SEQ"), primary_key=True)
     analyzed_at = Column(DateTime, default=func.now(), nullable=False)
     cam_number = Column(Integer, nullable=False)
-    metric_type = Column(String(50), nullable=False)  # "torque" or "angle"
+    metric_type = Column(String(100), nullable=False)  # VARCHAR2(100) - 실제 Oracle 구조
     
     # 분석 결과
     mean = Column(Float)

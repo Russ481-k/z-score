@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import axios from "axios";
+import { apiClient } from "@/lib/api";
 
 export interface ChartDataPoint {
   analyzed_at: string;
@@ -9,70 +9,32 @@ export interface ChartDataPoint {
   ppm_slope: number;
 }
 
-const initialChartData: ChartDataPoint[] = [
-  {
-    analyzed_at: new Date(Date.now() - 50000).toISOString(),
-    predicted_ppm: 150.5,
-    mean: 0.01,
-    std_dev: 0.08,
-    ppm_slope: 15.2,
-  },
-  {
-    analyzed_at: new Date(Date.now() - 40000).toISOString(),
-    predicted_ppm: 165.2,
-    mean: 0.02,
-    std_dev: 0.082,
-    ppm_slope: 15.2,
-  },
-  {
-    analyzed_at: new Date(Date.now() - 30000).toISOString(),
-    predicted_ppm: 158.8,
-    mean: 0.015,
-    std_dev: 0.081,
-    ppm_slope: 15.2,
-  },
-  {
-    analyzed_at: new Date(Date.now() - 20000).toISOString(),
-    predicted_ppm: 180.1,
-    mean: 0.03,
-    std_dev: 0.085,
-    ppm_slope: 15.2,
-  },
-  {
-    analyzed_at: new Date(Date.now() - 10000).toISOString(),
-    predicted_ppm: 210.7,
-    mean: 0.04,
-    std_dev: 0.09,
-    ppm_slope: 15.2,
-  },
-];
+interface ChartDataParams {
+  startDate: string;
+  endDate: string;
+  metric: string;
+  camNumber: number;
+}
 
 const fetchChartData = async (
-  startDate: string,
-  endDate: string,
-  metric: "angle" | "torque",
-  camNumber: number
+  params: ChartDataParams
 ): Promise<ChartDataPoint[]> => {
-  const { data } = await axios.get("/api/analysis/history", {
+  const response = await apiClient.get("/analysis/history", {
     params: {
-      start_date: startDate,
-      end_date: endDate,
-      metric,
-      cam_number: camNumber,
+      start_date: params.startDate,
+      end_date: params.endDate,
+      metric: params.metric,
+      cam_number: params.camNumber,
     },
   });
-  return data.data;
+  return response.data;
 };
 
-export const useChartData = (
-  startDate: string,
-  endDate: string,
-  metric: "angle" | "torque",
-  camNumber: number
-) => {
-  return useQuery<ChartDataPoint[]>({
-    queryKey: ["chartData", { startDate, endDate, metric, camNumber }],
-    queryFn: () => fetchChartData(startDate, endDate, metric, camNumber),
-    initialData: initialChartData,
+export const useChartData = (params: ChartDataParams) => {
+  return useQuery({
+    queryKey: ["chartData", params],
+    queryFn: () => fetchChartData(params),
+    staleTime: 30000, // 30초 동안 fresh 상태 유지
+    refetchInterval: 5000, // 5초마다 백그라운드에서 refetch
   });
 };
