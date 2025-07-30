@@ -75,55 +75,60 @@ const ProcessDistributionChart = memo(function ProcessDistributionChart() {
   }, [chartData, metric]);
 
   return (
-    <div>
-      <h3>Process Distribution ({metric})</h3>
-      <div style={{ marginBottom: "16px" }}>
+    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+      <div style={{ marginBottom: "12px", flexShrink: 0 }}>
+        <h3 style={{ margin: "0 0 8px 0", fontSize: "16px", color: "#fff" }}>
+          Process Distribution ({metric})
+        </h3>
         <select
           value={metric}
           onChange={(e) => setMetric(e.target.value as "angle" | "torque")}
           style={{
-            padding: "8px",
-            background: "#2a2a2a",
-            color: "#fff",
-            border: "1px solid #555",
+            padding: "4px 8px",
             borderRadius: "4px",
+            border: "1px solid #555",
+            background: "#333",
+            color: "#fff",
+            fontSize: "12px",
           }}
         >
           <option value="angle">Angle</option>
           <option value="torque">Torque</option>
         </select>
       </div>
-      <ResponsiveContainer width="100%" height={400}>
-        <BarChart data={chartDataWithError}>
-          <CartesianGrid strokeDasharray="3 3" />
-          <XAxis dataKey="cam_number" />
-          <YAxis domain={[-0.4, 0.4]} />
-          <Tooltip />
-          <Legend />
-          <ReferenceLine
-            key="usl"
-            y={USL}
-            label="USL"
-            stroke="red"
-            strokeDasharray="3 3"
-          />
-          <ReferenceLine
-            key="lsl"
-            y={LSL}
-            label="LSL"
-            stroke="red"
-            strokeDasharray="3 3"
-          />
-          <Bar dataKey="mean" fill="#8884d8">
-            <ErrorBar
-              dataKey="error"
-              width={4}
-              strokeWidth={2}
-              stroke="orange"
+      <div style={{ flex: 1, minHeight: 0 }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={chartDataWithError}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="cam_number" />
+            <YAxis domain={[-0.4, 0.4]} />
+            <Tooltip />
+            <Legend />
+            <ReferenceLine
+              key="usl"
+              y={USL}
+              label="USL"
+              stroke="red"
+              strokeDasharray="3 3"
             />
-          </Bar>
-        </BarChart>
-      </ResponsiveContainer>
+            <ReferenceLine
+              key="lsl"
+              y={LSL}
+              label="LSL"
+              stroke="red"
+              strokeDasharray="3 3"
+            />
+            <Bar dataKey="mean" fill="#8884d8">
+              <ErrorBar
+                dataKey="error"
+                width={4}
+                strokeWidth={2}
+                stroke="orange"
+              />
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
     </div>
   );
 });

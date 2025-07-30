@@ -50,6 +50,19 @@ class DisplayOrderUpdate(BaseModel):
     id: int
     display_order: int
 
+class InfiniteScrollRequest(BaseModel):
+    cursor: Optional[int] = None  # 마지막으로 받은 데이터의 ID
+    limit: int = 50  # 한 번에 가져올 데이터 개수
+    direction: str = "forward"  # forward(아래로) 또는 backward(위로)
+
+class InfiniteScrollResponse(BaseModel):
+    items: List[Dict[str, Any]]
+    next_cursor: Optional[int] = None
+    prev_cursor: Optional[int] = None
+    has_more: bool = False
+    total_count: Optional[int] = None
+    column_mapping: Dict[str, str] = {}
+
 @router.get("/list", summary="로우 데이터 목록 조회")
 def get_raw_data_list(
     skip: int = Query(0, ge=0),
@@ -136,6 +149,105 @@ def get_mapped_raw_data(
         "items": items,
         "column_mapping": mapper_dict  # 프론트엔드에서 컬럼 정의에 사용할 수 있도록
     }
+
+@router.get("/infinite-scroll", response_model=InfiniteScrollResponse, summary="무한스크롤용 매핑된 로우 데이터 조회")
+def get_infinite_scroll_data(
+    cursor: Optional[int] = Query(None, description="커서 (데이터 ID 또는 시작 행 번호)"),
+    limit: int = Query(50, ge=10, le=200, description="가져올 데이터 개수"),
+    direction: str = Query("forward", regex="^(forward|backward)$", description="스크롤 방향"),
+    start_row: Optional[int] = Query(None, description="AG Grid 호환: 시작 행 번호"),
+    db: Session = Depends(get_db)
+):
+    """
+    무한스크롤을 위한 커서 기반 페이지네이션으로 매핑된 로우 데이터를 조회합니다.
+    
+    - cursor: 기준점이 되는 데이터 ID (None이면 처음부터)
+    - limit: 한 번에 가져올 데이터 개수 (10-200)
+    - direction: forward(아래로), backward(위로)
+    """
+    
+    # 활성화된 컬럼 매퍼 조회
+    column_mappers = db.query(HandyColumnMapper).filter(
+        HandyColumnMapper.is_active == True
+    ).order_by(
+        HandyColumnMapper.display_order.asc(),
+        HandyColumnMapper.id.asc()
+    ).all()
+    
+    mapper_dict = {mapper.raw_column_name: mapper.mapped_column_name for mapper in column_mappers}
+    
+    # 전체 개수 (첫 요청시에만 필요)
+    total_count = None
+    if cursor is None and start_row is None:
+        total_count = db.query(HandyRawData).count()
+    
+    # AG Grid 호환 모드 vs 커서 모드
+    if start_row is not None:
+        # AG Grid 모드: 오프셋 기반 페이지네이션
+        query = db.query(HandyRawData).order_by(HandyRawData.id.desc())
+        raw_data_list = query.offset(start_row).limit(limit + 1).all()
+        
+        has_more = len(raw_data_list) > limit
+        if has_more:
+            raw_data_list = raw_data_list[:limit]
+            
+    else:
+        # 기존 커서 모드
+        query = db.query(HandyRawData)
+        
+        if cursor is not None:
+            if direction == "forward":
+                # 아래로 스크롤: 커서보다 작은 ID (최신 순 정렬이므로)
+                query = query.filter(HandyRawData.id < cursor)
+            else:  # backward
+                # 위로 스크롤: 커서보다 큰 ID
+                query = query.filter(HandyRawData.id > cursor)
+                query = query.order_by(HandyRawData.id.asc())  # 역순 정렬
+        
+        if direction == "forward" or cursor is None:
+            query = query.order_by(HandyRawData.id.desc())
+        
+        # limit + 1개를 가져와서 has_more 판단
+        raw_data_list = query.limit(limit + 1).all()
+        
+        has_more = len(raw_data_list) > limit
+        if has_more:
+            raw_data_list = raw_data_list[:limit]  # 실제로는 limit개만 반환
+        
+        # backward의 경우 원래 순서로 되돌리기
+        if direction == "backward":
+            raw_data_list = list(reversed(raw_data_list))
+    
+    # 결과 변환
+    items = []
+    for raw_data in raw_data_list:
+        mapped_data = {"id": raw_data.id}  # ID는 항상 포함
+        
+        for mapper in column_mappers:
+            raw_column_name = mapper.raw_column_name
+            column_value = getattr(raw_data, raw_column_name, None)
+            
+            if column_value is not None:
+                mapped_data[mapper.mapped_column_name] = column_value
+        
+        items.append(mapped_data)
+    
+    # 커서 설정
+    next_cursor = None
+    prev_cursor = None
+    
+    if items:
+        next_cursor = items[-1]["id"] if has_more else None
+        prev_cursor = items[0]["id"]
+    
+    return InfiniteScrollResponse(
+        items=items,
+        next_cursor=next_cursor,
+        prev_cursor=prev_cursor,
+        has_more=has_more,
+        total_count=total_count,
+        column_mapping=mapper_dict
+    )
 
 @router.get("/processed", summary="가공된 데이터 목록 조회")
 def get_processed_data_list(

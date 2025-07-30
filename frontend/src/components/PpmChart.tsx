@@ -69,10 +69,12 @@ const PpmChart = memo(function PpmChart() {
       queryClient.setQueryData(
         ["chartData", { startDate: "", endDate: "", metric, camNumber }],
         (oldData: ChartDataPoint[] | undefined) => {
-          if (!oldData) return [newPoint];
+          // oldData가 없거나 배열이 아닌 경우 새로운 배열로 시작
+          if (!oldData || !Array.isArray(oldData)) return [newPoint];
+
           // 데이터가 너무 많아지지 않도록 100개로 제한
           const newData = [...oldData, newPoint];
-          return newData?.slice(-100);
+          return newData.slice(-100);
         }
       );
     };
@@ -114,14 +116,29 @@ const PpmChart = memo(function PpmChart() {
   const currentData = getCurrentData();
 
   return (
-    <div>
-      <h3>
+    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+      <h3 style={{ margin: "0 0 12px 0", flexShrink: 0 }}>
         PPM Trend Prediction (CAM {camNumber} - {metric})
       </h3>
-      <div style={{ marginBottom: "16px" }}>
+      <div
+        style={{
+          marginBottom: "12px",
+          flexShrink: 0,
+          display: "flex",
+          gap: "8px",
+        }}
+      >
         <select
           value={metric}
           onChange={(e) => setMetric(e.target.value as "angle" | "torque")}
+          style={{
+            padding: "4px 8px",
+            borderRadius: "4px",
+            border: "1px solid #555",
+            background: "#333",
+            color: "#fff",
+            fontSize: "12px",
+          }}
         >
           <option value="angle">Angle</option>
           <option value="torque">Torque</option>
@@ -129,6 +146,14 @@ const PpmChart = memo(function PpmChart() {
         <select
           value={camNumber}
           onChange={(e) => setCamNumber(Number(e.target.value))}
+          style={{
+            padding: "4px 8px",
+            borderRadius: "4px",
+            border: "1px solid #555",
+            background: "#333",
+            color: "#fff",
+            fontSize: "12px",
+          }}
         >
           {Array.from({ length: 9 }, (_, i) => i + 1).map((num) => (
             <option key={num} value={num}>
@@ -137,67 +162,69 @@ const PpmChart = memo(function PpmChart() {
           ))}
         </select>
       </div>
-      <ResponsiveContainer width="100%" height={400}>
-        <LineChart data={currentData}>
-          <CartesianGrid strokeDasharray="3 3" />
-          <XAxis
-            dataKey="analyzed_at"
-            tickFormatter={(time) => new Date(time).toLocaleTimeString()}
-          />
-          <YAxis
-            yAxisId="left"
-            label={{ value: "PPM", angle: -90, position: "insideLeft" }}
-            domain={[
-              0,
-              (dataMax: number) =>
-                Math.max(dataMax * 1.2, PPM_ALARM_THRESHOLD + 50),
-            ]}
-          />
-          <YAxis
-            yAxisId="right"
-            orientation="right"
-            label={{ value: "Mean", angle: -90, position: "insideRight" }}
-          />
-          <Tooltip />
-          <Legend />
+      <div style={{ flex: 1, minHeight: 0 }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={currentData}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis
+              dataKey="analyzed_at"
+              tickFormatter={(time) => new Date(time).toLocaleTimeString()}
+            />
+            <YAxis
+              yAxisId="left"
+              label={{ value: "PPM", angle: -90, position: "insideLeft" }}
+              domain={[
+                0,
+                (dataMax: number) =>
+                  Math.max(dataMax * 1.2, PPM_ALARM_THRESHOLD + 50),
+              ]}
+            />
+            <YAxis
+              yAxisId="right"
+              orientation="right"
+              label={{ value: "Mean", angle: -90, position: "insideRight" }}
+            />
+            <Tooltip />
+            <Legend />
 
-          <ReferenceArea
-            yAxisId="left"
-            y1={PPM_WARNING_THRESHOLD}
-            y2={PPM_ALARM_THRESHOLD}
-            strokeOpacity={0.3}
-            fill="orange"
-            fillOpacity={0.2}
-            label={{ value: "Warning Zone", position: "insideTopRight" }}
-          />
-          <ReferenceLine
-            yAxisId="left"
-            y={PPM_ALARM_THRESHOLD}
-            label="Alarm"
-            stroke="red"
-            strokeDasharray="3 3"
-          />
+            <ReferenceArea
+              yAxisId="left"
+              y1={PPM_WARNING_THRESHOLD}
+              y2={PPM_ALARM_THRESHOLD}
+              strokeOpacity={0.3}
+              fill="orange"
+              fillOpacity={0.2}
+              label={{ value: "Warning Zone", position: "insideTopRight" }}
+            />
+            <ReferenceLine
+              yAxisId="left"
+              y={PPM_ALARM_THRESHOLD}
+              label="Alarm"
+              stroke="red"
+              strokeDasharray="3 3"
+            />
 
-          <Line
-            yAxisId="left"
-            type="monotone"
-            dataKey="predicted_ppm"
-            stroke="#8884d8"
-            name="Predicted PPM"
-            dot={false}
-            isAnimationActive={false}
-          />
-          <Line
-            yAxisId="right"
-            type="monotone"
-            dataKey="mean"
-            stroke="#82ca9d"
-            name="Mean"
-            dot={false}
-            isAnimationActive={false}
-          />
-        </LineChart>
-      </ResponsiveContainer>
+            <Line
+              yAxisId="left"
+              type="monotone"
+              dataKey="predicted_ppm"
+              stroke="#8884d8"
+              name="Predicted PPM"
+              dot={false}
+              isAnimationActive={false}
+            />
+            <Line
+              yAxisId="right"
+              type="monotone"
+              dataKey="mean"
+              stroke="#82ca9d"
+              name="Mean"
+              dot={false}
+              isAnimationActive={false}
+            />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
     </div>
   );
 });

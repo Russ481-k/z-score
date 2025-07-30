@@ -21,6 +21,28 @@ const DashboardView: React.FC = () => {
   );
   const [gridFilter, setGridFilter] = useState<"all" | "NG" | "OK">("all");
   const [isLive, setIsLive] = useState(false);
+  const [viewportHeight, setViewportHeight] = useState(0);
+
+  // 뷰포트 높이 감지
+  useEffect(() => {
+    const updateViewportHeight = () => {
+      // 탭 헤더와 패딩을 고려한 실제 사용 가능한 높이 계산
+      const tabHeaderHeight = 60; // 탭 헤더 높이
+      const paddingAndMargins = 120; // 패딩과 마진값들
+      const titleHeight = 60; // 제목 영역 높이
+      const availableHeight =
+        window.innerHeight - tabHeaderHeight - paddingAndMargins - titleHeight;
+      setViewportHeight(availableHeight);
+    };
+
+    updateViewportHeight();
+    window.addEventListener("resize", updateViewportHeight);
+    return () => window.removeEventListener("resize", updateViewportHeight);
+  }, []);
+
+  // 각 섹션의 높이 계산
+  const topSectionHeight = Math.max(300, viewportHeight * 0.45); // 45% 할당, 최소 300px
+  const bottomSectionHeight = Math.max(280, viewportHeight * 0.35); // 35% 할당, 최소 280px
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -40,11 +62,13 @@ const DashboardView: React.FC = () => {
       queryClient.setQueryData(
         ["products", { startDate: "", endDate: "", page: 1, size: 1000 }], // size를 1000으로 통일
         (oldData: ProductsResponse | undefined) => {
-          if (!oldData) return { total: 1, items: [newProduct] };
+          if (!oldData || !oldData.items || !Array.isArray(oldData.items)) {
+            return { total: 1, items: [newProduct] };
+          }
           // 새로운 데이터를 앞에 추가하고, 배열 길이를 1000으로 제한
           const newItems = [newProduct, ...oldData.items].slice(0, 1000);
           return {
-            total: newItems?.length ?? 0,
+            total: newItems.length,
             items: newItems,
           };
         }
@@ -70,9 +94,9 @@ const DashboardView: React.FC = () => {
             { startDate: "", endDate: "", metric: "angle", camNumber: i },
           ],
           (oldData: ChartDataPoint[] | undefined) => {
-            if (!oldData) return [newAnglePoint];
+            if (!oldData || !Array.isArray(oldData)) return [newAnglePoint];
             const newData = [...oldData, newAnglePoint];
-            return newData?.slice(-100);
+            return newData.slice(-100);
           }
         );
 
@@ -90,9 +114,9 @@ const DashboardView: React.FC = () => {
             { startDate: "", endDate: "", metric: "torque", camNumber: i },
           ],
           (oldData: ChartDataPoint[] | undefined) => {
-            if (!oldData) return [newTorquePoint];
+            if (!oldData || !Array.isArray(oldData)) return [newTorquePoint];
             const newData = [...oldData, newTorquePoint];
-            return newData?.slice(-100);
+            return newData.slice(-100);
           }
         );
       }
@@ -125,10 +149,19 @@ const DashboardView: React.FC = () => {
         display: "flex",
         flexDirection: "column",
         gap: "20px",
-        height: "100%",
+        overflow: "hidden",
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: "15px" }}>
+      {/* 헤더 섹션 */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "15px",
+          flexShrink: 0,
+          height: "60px",
+        }}
+      >
         <h2 style={{ color: "#fff", margin: 0 }}>실시간 모니터링 대시보드</h2>
         <span
           style={{
@@ -145,12 +178,14 @@ const DashboardView: React.FC = () => {
         </span>
       </div>
 
+      {/* 상단 섹션: 그리드 + 상태 차트들 */}
       <div
         style={{
           display: "grid",
           gridTemplateColumns: "2fr 1fr",
           gap: "20px",
-          height: "400px",
+          height: `${topSectionHeight}px`,
+          flexShrink: 0,
         }}
       >
         <div
@@ -159,18 +194,28 @@ const DashboardView: React.FC = () => {
             borderRadius: "8px",
             padding: "15px",
             overflow: "hidden",
+            display: "flex",
+            flexDirection: "column",
           }}
         >
           <Grid onRowSelected={setSelectedProductId} filter={gridFilter} />
         </div>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: "15px" }}>
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: "15px",
+            height: "100%",
+          }}
+        >
           <div
             style={{
               background: "#2a2a2a",
               borderRadius: "8px",
               padding: "15px",
               flex: 1,
+              minHeight: 0,
             }}
           >
             <OverallStatusChart onSliceClick={setGridFilter} />
@@ -181,6 +226,7 @@ const DashboardView: React.FC = () => {
               borderRadius: "8px",
               padding: "15px",
               flex: 1,
+              minHeight: 0,
             }}
           >
             <MeasurementDetailsChart productId={selectedProductId} />
@@ -188,12 +234,14 @@ const DashboardView: React.FC = () => {
         </div>
       </div>
 
+      {/* 하단 섹션: PPM 차트 + 공정 분포 차트 */}
       <div
         style={{
           display: "grid",
           gridTemplateColumns: "1fr 1fr",
           gap: "20px",
-          height: "400px",
+          height: `${bottomSectionHeight}px`,
+          flexShrink: 0,
         }}
       >
         <div
@@ -201,6 +249,7 @@ const DashboardView: React.FC = () => {
             background: "#2a2a2a",
             borderRadius: "8px",
             padding: "15px",
+            overflow: "hidden",
           }}
         >
           <PpmChart />
@@ -210,6 +259,7 @@ const DashboardView: React.FC = () => {
             background: "#2a2a2a",
             borderRadius: "8px",
             padding: "15px",
+            overflow: "hidden",
           }}
         >
           <ProcessDistributionChart />

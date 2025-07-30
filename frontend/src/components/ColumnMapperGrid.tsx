@@ -7,6 +7,7 @@ import "ag-grid-community/styles/ag-theme-quartz.css";
 import { ColDef, ICellRendererParams } from "ag-grid-community";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api";
+import { useToast } from "./ToastContainer";
 
 ModuleRegistry.registerModules([AllCommunityModule]);
 
@@ -38,6 +39,7 @@ const ColumnMapperGrid: React.FC = () => {
   });
   const [editingId, setEditingId] = useState<number | null>(null);
   const queryClient = useQueryClient();
+  const { showToast } = useToast();
 
   // 컬럼 매퍼 목록 조회
   const { data, isLoading, error } = useQuery({
@@ -65,6 +67,13 @@ const ColumnMapperGrid: React.FC = () => {
         display_order: 0,
         is_active: true,
       });
+      showToast("새로운 컬럼 매핑이 추가되었습니다.", "success");
+    },
+    onError: (error: any) => {
+      showToast(
+        error.response?.data?.detail || "컬럼 매핑을 추가하는데 실패했습니다.",
+        "error"
+      );
     },
   });
 
@@ -86,7 +95,14 @@ const ColumnMapperGrid: React.FC = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["column-mappers"] });
       queryClient.invalidateQueries({ queryKey: ["mapped-raw-data"] });
-      setEditingId(null);
+      setEditingId(null); // 편집 모드 해제
+      showToast("컬럼 매핑이 수정되었습니다.", "success");
+    },
+    onError: (error: any) => {
+      showToast(
+        error.response?.data?.detail || "컬럼 매핑을 수정하는데 실패했습니다.",
+        "error"
+      );
     },
   });
 
@@ -99,6 +115,13 @@ const ColumnMapperGrid: React.FC = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["column-mappers"] });
       queryClient.invalidateQueries({ queryKey: ["mapped-raw-data"] });
+      showToast("컬럼 매핑이 삭제되었습니다.", "success");
+    },
+    onError: (error: any) => {
+      showToast(
+        error.response?.data?.detail || "컬럼 매핑을 삭제하는데 실패했습니다.",
+        "error"
+      );
     },
   });
 
@@ -113,6 +136,14 @@ const ColumnMapperGrid: React.FC = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["column-mappers"] });
       queryClient.invalidateQueries({ queryKey: ["mapped-raw-data"] });
+      showToast("전체 컬럼 매핑이 초기화되었습니다.", "success");
+    },
+    onError: (error: any) => {
+      showToast(
+        error.response?.data?.detail ||
+          "컬럼 매핑을 초기화하는데 실패했습니다.",
+        "error"
+      );
     },
   });
 
@@ -133,6 +164,14 @@ const ColumnMapperGrid: React.FC = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["column-mappers"] });
       queryClient.invalidateQueries({ queryKey: ["mapped-raw-data"] });
+      showToast("컬럼 매핑의 활성 상태가 변경되었습니다.", "info");
+    },
+    onError: (error: any) => {
+      showToast(
+        error.response?.data?.detail ||
+          "컬럼 매핑의 활성 상태를 변경하는데 실패했습니다.",
+        "error"
+      );
     },
   });
 
@@ -192,6 +231,7 @@ const ColumnMapperGrid: React.FC = () => {
             justifyContent: "center",
             alignItems: "center",
             height: "100%",
+            gap: "6px",
           }}
         >
           <button
@@ -221,7 +261,15 @@ const ColumnMapperGrid: React.FC = () => {
     }
 
     return (
-      <div style={{ display: "flex", gap: "8px" }}>
+      <div
+        style={{
+          display: "flex",
+          gap: "6px",
+          justifyContent: "center",
+          alignItems: "center",
+          height: "100%",
+        }}
+      >
         <button
           onClick={() => setEditingId(params.data.id)}
           className="action-btn edit-btn"
@@ -230,7 +278,8 @@ const ColumnMapperGrid: React.FC = () => {
         </button>
         <button
           onClick={() => {
-            if (confirm("정말 삭제하시겠습니까?")) {
+            const isConfirmed = window.confirm("정말 삭제하시겠습니까?");
+            if (isConfirmed) {
               deleteMutation.mutate(params.data.id);
             }
           }}
@@ -246,15 +295,23 @@ const ColumnMapperGrid: React.FC = () => {
   const EditableCellRenderer = (params: ICellRendererParams) => {
     const isEditing = editingId === params.data.id;
     const field = params.colDef?.field;
+    const [localValue, setLocalValue] = useState(params.value);
+
+    // params.value가 변경될 때 로컬 상태 업데이트
+    useEffect(() => {
+      setLocalValue(params.value);
+    }, [params.value]);
 
     if (isEditing && field) {
       if (field === "display_order") {
         return (
           <input
             type="number"
-            value={params.value || 0}
+            value={localValue || 0}
             onChange={(e) => {
-              params.data[field] = Number(e.target.value);
+              const newValue = Number(e.target.value);
+              setLocalValue(newValue); // 즉시 UI 반영
+              params.data[field] = newValue; // 데이터 업데이트
             }}
             className="edit-input number-input"
           />
@@ -263,9 +320,11 @@ const ColumnMapperGrid: React.FC = () => {
         return (
           <input
             type="text"
-            value={params.value || ""}
+            value={localValue || ""}
             onChange={(e) => {
-              params.data[field] = e.target.value;
+              const newValue = e.target.value;
+              setLocalValue(newValue); // 즉시 UI 반영
+              params.data[field] = newValue; // 데이터 업데이트
             }}
             className="edit-input"
           />
@@ -279,6 +338,18 @@ const ColumnMapperGrid: React.FC = () => {
   const colDefs: ColDef[] = useMemo(
     () => [
       {
+        field: "is_active",
+        headerName: "활성",
+        width: 80,
+        cellRenderer: ActiveToggleRenderer,
+      },
+      {
+        field: "display_order",
+        headerName: "순서",
+        width: 80,
+        cellRenderer: EditableCellRenderer,
+      },
+      {
         field: "raw_column_name",
         headerName: "원본 컬럼명",
         width: 150,
@@ -291,23 +362,13 @@ const ColumnMapperGrid: React.FC = () => {
         cellRenderer: EditableCellRenderer,
       },
       {
+        flex: 1,
         field: "description",
         headerName: "설명",
         width: 200,
         cellRenderer: EditableCellRenderer,
       },
-      {
-        field: "display_order",
-        headerName: "순서",
-        width: 80,
-        cellRenderer: EditableCellRenderer,
-      },
-      {
-        field: "is_active",
-        headerName: "활성",
-        width: 80,
-        cellRenderer: ActiveToggleRenderer,
-      },
+
       {
         headerName: "액션",
         width: 120,
@@ -321,18 +382,17 @@ const ColumnMapperGrid: React.FC = () => {
 
   const handleAddMapper = () => {
     if (!newMapper.raw_column_name || !newMapper.mapped_column_name) {
-      alert("원본 컬럼명과 매핑된 컬럼명을 입력해주세요.");
+      showToast("원본 컬럼명과 매핑된 컬럼명을 입력해주세요.", "warning");
       return;
     }
     createMutation.mutate(newMapper);
   };
 
   const handleInitializeAll = () => {
-    if (
-      confirm(
-        "전체 컬럼(d000~d149)을 초기화하시겠습니까? 기존 데이터는 모두 삭제됩니다."
-      )
-    ) {
+    const isConfirmed = window.confirm(
+      "전체 컬럼(d000~d149)을 초기화하시겠습니까? 기존 데이터는 모두 삭제됩니다."
+    );
+    if (isConfirmed) {
       initializeAllMutation.mutate();
     }
   };
@@ -371,17 +431,29 @@ const ColumnMapperGrid: React.FC = () => {
           box-shadow: 0 2px 16px rgba(0, 0, 0, 0.2);
         }
 
+        .header-top {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 16px;
+        }
+
         .header-title {
           font-size: 24px;
           font-weight: 600;
           color: #ffffff;
           margin: 0;
-          margin-bottom: 16px;
         }
 
         .header-controls {
           display: flex;
           gap: 10px;
+          flex-wrap: wrap;
+        }
+
+        .header-stats {
+          display: flex;
+          gap: 16px;
           flex-wrap: wrap;
         }
 
@@ -483,18 +555,6 @@ const ColumnMapperGrid: React.FC = () => {
           border-radius: 6px;
         }
 
-        .stats-card {
-          background: rgba(255, 255, 255, 0.03);
-          backdrop-filter: blur(20px);
-          border: 1px solid rgba(255, 255, 255, 0.06);
-          border-radius: 12px;
-          padding: 16px;
-          margin-bottom: 20px;
-          display: flex;
-          gap: 16px;
-          flex-wrap: wrap;
-        }
-
         .stat-item {
           display: flex;
           align-items: center;
@@ -530,58 +590,67 @@ const ColumnMapperGrid: React.FC = () => {
         }
 
         :global(.action-btn) {
-          padding: 4px 6px;
+          padding: 6px 8px;
           border: none;
-          border-radius: 4px;
-          font-size: 11px;
+          border-radius: 6px;
+          font-size: 12px;
           cursor: pointer;
-          transition: all 0.2s ease;
-          min-width: 28px;
-          height: 28px;
+          transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+          min-width: 32px;
+          height: 32px;
           display: flex;
           align-items: center;
           justify-content: center;
+          font-weight: 500;
+          letter-spacing: 0.3px;
         }
 
         :global(.save-btn) {
-          background: rgba(255, 255, 255, 0.1);
-          color: white;
-          border: 1px solid rgba(255, 255, 255, 0.15);
+          background: rgba(76, 175, 80, 0.15);
+          color: #4caf50;
+          border: 1px solid rgba(76, 175, 80, 0.3);
         }
 
         :global(.save-btn:hover) {
-          background: rgba(255, 255, 255, 0.15);
+          background: rgba(76, 175, 80, 0.25);
+          transform: translateY(-1px);
+          box-shadow: 0 2px 8px rgba(76, 175, 80, 0.2);
         }
 
         :global(.cancel-btn) {
-          background: rgba(255, 255, 255, 0.05);
-          color: #ccc;
-          border: 1px solid rgba(255, 255, 255, 0.08);
+          background: rgba(255, 255, 255, 0.08);
+          color: #bbb;
+          border: 1px solid rgba(255, 255, 255, 0.15);
         }
 
         :global(.cancel-btn:hover) {
-          background: rgba(255, 255, 255, 0.1);
+          background: rgba(255, 255, 255, 0.15);
+          color: #fff;
+          transform: translateY(-1px);
         }
 
         :global(.edit-btn) {
-          background: rgba(255, 255, 255, 0.08);
-          color: white;
-          border: 1px solid rgba(255, 255, 255, 0.1);
+          background: rgba(33, 150, 243, 0.15);
+          color: #2196f3;
+          border: 1px solid rgba(33, 150, 243, 0.3);
         }
 
         :global(.edit-btn:hover) {
-          background: rgba(255, 255, 255, 0.12);
+          background: rgba(33, 150, 243, 0.25);
+          transform: translateY(-1px);
+          box-shadow: 0 2px 8px rgba(33, 150, 243, 0.2);
         }
 
         :global(.delete-btn) {
-          background: rgba(255, 255, 255, 0.06);
-          color: #ccc;
-          border: 1px solid rgba(255, 255, 255, 0.08);
+          background: rgba(244, 67, 54, 0.15);
+          color: #f44336;
+          border: 1px solid rgba(244, 67, 54, 0.3);
         }
 
         :global(.delete-btn:hover) {
-          background: rgba(255, 255, 255, 0.1);
-          color: #fff;
+          background: rgba(244, 67, 54, 0.25);
+          transform: translateY(-1px);
+          box-shadow: 0 2px 8px rgba(244, 67, 54, 0.2);
         }
 
         :global(.edit-input) {
@@ -647,24 +716,50 @@ const ColumnMapperGrid: React.FC = () => {
       `}</style>
 
       <div className="header-card">
-        <h1 className="header-title">컬럼 매퍼 관리</h1>
-        <div className="header-controls">
-          <button
-            onClick={handleInitializeAll}
-            disabled={initializeAllMutation.isPending}
-            className="modern-btn warning-btn"
-          >
-            ↻{" "}
-            {initializeAllMutation.isPending
-              ? "초기화 중..."
-              : "전체 컬럼 초기화"}
-          </button>
-          <button
-            onClick={() => setIsAddMode(!isAddMode)}
-            className="modern-btn primary-btn"
-          >
-            {isAddMode ? "✕ 취소" : "+ 새 매핑 추가"}
-          </button>
+        <div className="header-top">
+          <h1 className="header-title">컬럼 매퍼 관리</h1>
+          <div className="header-controls">
+            <button
+              onClick={handleInitializeAll}
+              disabled={initializeAllMutation.isPending}
+              className="modern-btn warning-btn"
+            >
+              ↻{" "}
+              {initializeAllMutation.isPending
+                ? "초기화 중..."
+                : "전체 컬럼 초기화"}
+            </button>
+            <button
+              onClick={() => setIsAddMode(!isAddMode)}
+              className="modern-btn primary-btn"
+            >
+              {isAddMode ? "✕ 취소" : "+ 새 매핑 추가"}
+            </button>
+          </div>
+        </div>
+        <div className="header-stats">
+          <div className="stat-item">
+            <span>▤</span>
+            <span>총 {data?.total || 0}개의 컬럼 매핑</span>
+          </div>
+          <div className="stat-item">
+            <span>●</span>
+            <span>
+              활성화된 컬럼:{" "}
+              {data?.items?.filter((item: ColumnMapper) => item.is_active)
+                .length || 0}
+              개
+            </span>
+          </div>
+          <div className="stat-item">
+            <span>○</span>
+            <span>
+              비활성화된 컬럼:{" "}
+              {data?.items?.filter((item: ColumnMapper) => !item.is_active)
+                .length || 0}
+              개
+            </span>
+          </div>
         </div>
       </div>
 
@@ -738,31 +833,6 @@ const ColumnMapperGrid: React.FC = () => {
         </div>
       )}
 
-      <div className="stats-card">
-        <div className="stat-item">
-          <span>▤</span>
-          <span>총 {data?.total || 0}개의 컬럼 매핑</span>
-        </div>
-        <div className="stat-item">
-          <span>●</span>
-          <span>
-            활성화된 컬럼:{" "}
-            {data?.items?.filter((item: ColumnMapper) => item.is_active)
-              .length || 0}
-            개
-          </span>
-        </div>
-        <div className="stat-item">
-          <span>○</span>
-          <span>
-            비활성화된 컬럼:{" "}
-            {data?.items?.filter((item: ColumnMapper) => !item.is_active)
-              .length || 0}
-            개
-          </span>
-        </div>
-      </div>
-
       <div className="grid-card">
         <div className="grid-wrapper">
           <div
@@ -777,7 +847,6 @@ const ColumnMapperGrid: React.FC = () => {
                 sortable: true,
                 filter: true,
               }}
-              rowSelection={{ mode: "multiRow" }}
               animateRows={true}
               suppressClickEdit={true}
               suppressCellFocus={true}

@@ -55,8 +55,15 @@ const OverallStatusChart = memo(function OverallStatusChart({
   };
 
   return (
-    <div style={{ display: "flex", alignItems: "center", width: "100%" }}>
-      <ResponsiveContainer width="60%" height={300}>
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        width: "100%",
+        height: "100%",
+      }}
+    >
+      <ResponsiveContainer width="60%" height="100%">
         <PieChart>
           <Pie
             data={statusData}
