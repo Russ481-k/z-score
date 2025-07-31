@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy import text, func
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 from pydantic import BaseModel
@@ -62,6 +63,23 @@ class InfiniteScrollResponse(BaseModel):
     has_more: bool = False
     total_count: Optional[int] = None
     column_mapping: Dict[str, str] = {}
+
+class QueryRequest(BaseModel):
+    sql_query: str
+    model_name: Optional[str] = None
+    date_range: Optional[Dict[str, str]] = None
+    limit: Optional[int] = 1000
+
+class ModelColumnMapping(BaseModel):
+    model_name: str
+    column_mappings: Dict[str, str]
+    total_columns: int
+
+class DynamicQueryResponse(BaseModel):
+    items: List[Dict[str, Any]]
+    column_definitions: List[Dict[str, str]]
+    total_count: int
+    model_info: Optional[Dict[str, Any]] = None
 
 @router.get("/list", summary="로우 데이터 목록 조회")
 def get_raw_data_list(
@@ -447,3 +465,278 @@ def get_raw_data_detail(
         "create_time": raw_data.create_time.isoformat() if raw_data.create_time else None,
         "all_columns": all_columns
     }
+
+@router.get("/models", summary="사용 가능한 모델 목록 조회")
+def get_available_models(db: Session = Depends(get_db)):
+    """Raw data에서 사용 가능한 모델 목록을 조회합니다."""
+    try:
+        # d001 컬럼에서 고유한 모델명 조회 (null이 아닌 값만)
+        models = db.execute(
+            text("SELECT DISTINCT d001 as model_name FROM HANDY_ZSCORE_RAW_DATA WHERE d001 IS NOT NULL ORDER BY d001")
+        ).fetchall()
+        
+        model_list = [{"model_name": row.model_name, "display_name": row.model_name} for row in models]
+        
+        return {
+            "total": len(model_list),
+            "models": model_list
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch models: {str(e)}")
+
+@router.get("/models/{model_name}/columns", response_model=ModelColumnMapping, summary="모델별 컬럼 매핑 조회")
+def get_model_column_mapping(
+    model_name: str,
+    db: Session = Depends(get_db)
+):
+    """특정 모델에 대한 컬럼 매핑 정보를 조회합니다."""
+    try:
+        # 해당 모델의 샘플 데이터 조회 (1개만)
+        sample_data = db.execute(
+            text("SELECT * FROM HANDY_ZSCORE_RAW_DATA WHERE d001 = :model_name AND ROWNUM = 1"),
+            {"model_name": model_name}
+        ).fetchone()
+        
+        if not sample_data:
+            raise HTTPException(status_code=404, detail=f"Model '{model_name}' not found")
+        
+        # 활성화된 컬럼 매퍼 조회
+        column_mappers = db.query(HandyColumnMapper).filter(
+            HandyColumnMapper.is_active == True
+        ).order_by(
+            HandyColumnMapper.display_order.asc(),
+            HandyColumnMapper.id.asc()
+        ).all()
+        
+        # 모델별 특화 매핑 (캠 위상각 데이터 기준)
+        model_specific_mappings = {}
+        
+        # 기본 매핑 적용
+        for mapper in column_mappers:
+            raw_col = mapper.raw_column_name
+            if hasattr(sample_data, raw_col):
+                col_value = getattr(sample_data, raw_col, None)
+                if col_value is not None and str(col_value).strip():
+                    model_specific_mappings[raw_col] = mapper.mapped_column_name
+        
+        # 모델별 특화 처리 (제공된 표 기준)
+        if "ATKINSON" in model_name.upper():
+            # ATKINSON 모델의 경우 캠 위상각 특화 매핑
+            cam_angle_mappings = {
+                "d010": "Cam_Phase_Angle_1",  # 캠 위상각#1 - 52.08°
+                "d011": "Cam_Phase_Angle_2",  # 캠 위상각#2 - 52.08°
+                "d012": "Cam_Phase_Angle_3",  # 캠 위상각#3 - 172.08°
+                "d013": "Cam_Phase_Angle_4",  # 캠 위상각#4 - 172.08°
+                "d014": "Cam_Phase_Angle_5",  # 캠 위상각#5 - 292.08°
+                "d015": "Cam_Phase_Angle_6",  # 캠 위상각#6 - 292.08°
+            }
+            
+            # 샘플 데이터에서 실제 값이 있는 컬럼만 추가
+            for raw_col, mapped_name in cam_angle_mappings.items():
+                if hasattr(sample_data, raw_col):
+                    col_value = getattr(sample_data, raw_col, None)
+                    if col_value is not None and str(col_value).strip():
+                        model_specific_mappings[raw_col] = mapped_name
+        
+        return ModelColumnMapping(
+            model_name=model_name,
+            column_mappings=model_specific_mappings,
+            total_columns=len(model_specific_mappings)
+        )
+        
+    except Exception as e:
+        if isinstance(e, HTTPException):
+            raise e
+        raise HTTPException(status_code=500, detail=f"Failed to fetch column mapping: {str(e)}")
+
+@router.post("/query", response_model=DynamicQueryResponse, summary="동적 쿼리 기반 Raw Data 조회")
+def query_raw_data(
+    request: QueryRequest,
+    db: Session = Depends(get_db)
+):
+    """사용자 정의 쿼리로 Raw Data를 조회합니다."""
+    try:
+        # 기본 쿼리 안전성 검사
+        sql_lower = request.sql_query.lower().strip()
+        
+        # 위험한 키워드 검사
+        dangerous_keywords = ["drop", "delete", "update", "insert", "alter", "truncate", "create"]
+        if any(keyword in sql_lower for keyword in dangerous_keywords):
+            raise HTTPException(status_code=400, detail="Only SELECT queries are allowed")
+        
+        if not sql_lower.startswith("select"):
+            raise HTTPException(status_code=400, detail="Query must start with SELECT")
+        
+        # 모델명이 지정된 경우 WHERE 조건 추가
+        base_query = request.sql_query
+        if request.model_name:
+            if "where" in sql_lower:
+                base_query += f" AND d001 = '{request.model_name}'"
+            else:
+                base_query += f" WHERE d001 = '{request.model_name}'"
+        
+        # 날짜 범위가 지정된 경우 추가
+        if request.date_range:
+            start_date = request.date_range.get("start_date")
+            end_date = request.date_range.get("end_date")
+            if start_date and end_date:
+                if "where" in base_query.lower():
+                    base_query += f" AND create_time BETWEEN '{start_date}' AND '{end_date}'"
+                else:
+                    base_query += f" WHERE create_time BETWEEN '{start_date}' AND '{end_date}'"
+        
+        # LIMIT 추가
+        if "limit" not in sql_lower and "rownum" not in sql_lower:
+            limit = min(request.limit or 1000, 5000)  # 최대 5000개로 제한
+            base_query = f"SELECT * FROM ({base_query}) WHERE ROWNUM <= {limit}"
+        
+        # 쿼리 실행
+        result = db.execute(text(base_query))
+        rows = result.fetchall()
+        columns = result.keys()
+        
+        # 결과를 딕셔너리 리스트로 변환
+        items = []
+        for row_idx, row in enumerate(rows):
+            item = {}
+            has_id = False
+            
+            for i, col_name in enumerate(columns):
+                value = row[i]
+                if col_name.lower() == 'id':
+                    has_id = True
+                    item['id'] = value if value is not None else f"query_row_{row_idx}"
+                elif value is not None:
+                    item[col_name] = str(value)
+                else:
+                    item[col_name] = None
+            
+            # id 컬럼이 없는 경우 고유 ID 생성
+            if not has_id:
+                item['id'] = f"query_row_{row_idx}"
+                
+            items.append(item)
+        
+        # 컬럼 정의 생성
+        column_definitions = []
+        for col_name in columns:
+            # 컬럼 매퍼에서 매핑된 이름 찾기
+            mapper = db.query(HandyColumnMapper).filter(
+                HandyColumnMapper.raw_column_name == col_name.lower(),
+                HandyColumnMapper.is_active == True
+            ).first()
+            
+            display_name = mapper.mapped_column_name if mapper else col_name
+            
+            column_definitions.append({
+                "field": col_name,
+                "headerName": display_name,
+                "raw_column": col_name.lower()
+            })
+        
+        # 모델 정보 (모델명이 지정된 경우)
+        model_info = None
+        if request.model_name:
+            model_info = {
+                "model_name": request.model_name,
+                "query_applied": True
+            }
+        
+        return DynamicQueryResponse(
+            items=items,
+            column_definitions=column_definitions,
+            total_count=len(items),
+            model_info=model_info
+        )
+        
+    except Exception as e:
+        if isinstance(e, HTTPException):
+            raise e
+        raise HTTPException(status_code=500, detail=f"Query execution failed: {str(e)}")
+
+@router.get("/models/{model_name}/data", summary="모델별 데이터 조회")
+def get_model_data(
+    model_name: str,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, le=1000),
+    date_from: Optional[str] = Query(None, description="시작 날짜 (YYYY-MM-DD)"),
+    date_to: Optional[str] = Query(None, description="종료 날짜 (YYYY-MM-DD)"),
+    db: Session = Depends(get_db)
+):
+    """특정 모델의 데이터를 조회합니다."""
+    try:
+        # 기본 쿼리
+        base_query = "SELECT * FROM HANDY_ZSCORE_RAW_DATA WHERE d001 = :model_name"
+        params = {"model_name": model_name}
+        
+        # 날짜 필터 추가
+        if date_from and date_to:
+            base_query += " AND create_time BETWEEN :date_from AND :date_to"
+            params["date_from"] = date_from
+            params["date_to"] = date_to
+        elif date_from:
+            base_query += " AND create_time >= :date_from"
+            params["date_from"] = date_from
+        elif date_to:
+            base_query += " AND create_time <= :date_to"
+            params["date_to"] = date_to
+        
+        # 총 개수 조회
+        count_query = f"SELECT COUNT(*) as total FROM ({base_query})"
+        total_result = db.execute(text(count_query), params)
+        total = total_result.fetchone().total
+        
+        # 페이징된 데이터 조회
+        paginated_query = f"""
+        SELECT * FROM (
+            SELECT ROW_NUMBER() OVER (ORDER BY id DESC) as rn, t.* 
+            FROM ({base_query}) t
+        ) WHERE rn > :skip AND rn <= :end_row
+        """
+        
+        params["skip"] = skip
+        params["end_row"] = skip + limit
+        
+        result = db.execute(text(paginated_query), params)
+        rows = result.fetchall()
+        columns = result.keys()
+        
+        # 모델별 컬럼 매핑 가져오기
+        model_mapping = get_model_column_mapping(model_name, db)
+        
+        # 결과 변환
+        items = []
+        for row in rows:
+            item = {}
+            # 먼저 id 필드 확인 및 추가
+            if hasattr(row, 'id') and row.id is not None:
+                item['id'] = row.id
+            
+            for i, col_name in enumerate(columns):
+                # id 필드는 별도 처리했으므로 여기서는 매핑된 컬럼만 처리
+                if col_name.lower() == 'id':
+                    if 'id' not in item:  # 위에서 추가되지 않은 경우만
+                        item['id'] = row[i]
+                elif col_name.lower() in model_mapping.column_mappings:
+                    mapped_name = model_mapping.column_mappings[col_name.lower()]
+                    value = row[i]
+                    if value is not None:
+                        item[mapped_name] = str(value)
+            
+            # id가 여전히 없는 경우 인덱스로 생성
+            if 'id' not in item:
+                item['id'] = f"model_row_{len(items)}"
+                
+            items.append(item)
+        
+        return {
+            "total": total,
+            "items": items,
+            "model_name": model_name,
+            "column_mapping": model_mapping.column_mappings
+        }
+        
+    except Exception as e:
+        if isinstance(e, HTTPException):
+            raise e
+        raise HTTPException(status_code=500, detail=f"Failed to fetch model data: {str(e)}")
