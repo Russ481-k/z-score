@@ -37,14 +37,27 @@ const OverallTrendChart: React.FC<OverallTrendChartProps> = memo(({ data }) => {
           color: "#fff",
           marginBottom: "10px",
           fontSize: "14px",
+          display: "flex",
+          alignItems: "center",
+          gap: "8px",
         }}
       >
         ▦ Overall Mean & PPM Trends
+        <span
+          style={{
+            fontSize: "12px",
+            color: "#9CA3AF",
+            cursor: "help",
+          }}
+          title="Overall trend analysis showing mean values (green line, left axis) and PPM defect rates (red line, right axis) over time. Log scale is used for PPM to better visualize large value ranges."
+        >
+          ℹ️
+        </span>
       </h3>
       <ResponsiveContainer width="100%" height="85%">
         <LineChart data={data}>
           <CartesianGrid strokeDasharray="3 3" stroke="#444" />
-          <XAxis dataKey="index" stroke="#ccc" fontSize={10} />
+          <XAxis dataKey="index" stroke="#ccc" fontSize={10} domain={[1, 60]} />
           <YAxis yAxisId="left" stroke="#4CAF50" fontSize={10} />
           <YAxis
             yAxisId="right"
@@ -71,22 +84,24 @@ const OverallTrendChart: React.FC<OverallTrendChartProps> = memo(({ data }) => {
           <Legend fontSize={11} />
           <Line
             yAxisId="left"
-            type="monotone"
+            type="linear"
             dataKey="mean"
             stroke="#4CAF50"
-            strokeWidth={2}
-            dot={{ r: 1, fill: "#4CAF50", strokeWidth: 0 }}
-            connectNulls={false}
+            strokeWidth={1}
+            dot={{ r: 0.5, fill: "#4CAF50", strokeWidth: 1 }}
+            connectNulls={true}
+            isAnimationActive={false}
             name="Mean"
           />
           <Line
             yAxisId="right"
-            type="monotone"
+            type="linear"
             dataKey="ppm"
             stroke="#FF5722"
-            strokeWidth={2}
-            dot={{ r: 1, fill: "#FF5722", strokeWidth: 0 }}
-            connectNulls={false}
+            strokeWidth={1}
+            dot={{ r: 0.5, fill: "#FF5722", strokeWidth: 1 }}
+            connectNulls={true}
+            isAnimationActive={false}
             name="PPM"
           />
         </LineChart>

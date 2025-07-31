@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  useRef,
+} from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api";
 import { useToast } from "./ToastContainer";
@@ -62,6 +68,23 @@ interface Model {
   display_name: string;
 }
 
+// 모던하고 점잖은 색상 테마 정의
+const MODERN_COLORS = {
+  primary: "#4F46E5", // 차분한 인디고
+  secondary: "#059669", // 차분한 초록색
+  warning: "#D97706", // 차분한 주황색
+  danger: "#DC2626", // 차분한 빨간색
+  info: "#6366F1", // 차분한 보라색
+  neutral: "#6B7280", // 중성 회색
+  dark: "#374151", // 어두운 회색
+  darker: "#1F2937", // 더 어두운 회색
+  light: "#F9FAFB", // 밝은 회색
+  text: "#F3F4F6", // 텍스트 색상
+  border: "#4B5563", // 테두리 색상
+  muted: "#9CA3AF", // 음소거된 회색
+  background: "#2D3748", // 배경색
+};
+
 const BacktestingPanel: React.FC = () => {
   // 모델별 실시간 백테스팅 상태
   const [modelParameters, setModelParameters] =
@@ -78,10 +101,12 @@ const BacktestingPanel: React.FC = () => {
   );
   const [availableModels, setAvailableModels] = useState<Model[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [previousDefectStates, setPreviousDefectStates] = useState<{
     [key: string]: boolean;
   }>({});
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // 모델 목록 조회
   const { data: modelsData } = useQuery<{ models: Model[] }>({
@@ -240,33 +265,121 @@ const BacktestingPanel: React.FC = () => {
   const startRealTimeSimulation = useCallback(() => {
     if (!modelResults || isProcessing) return;
 
-    setIsProcessing(true);
-    setCurrentIndex(0);
+    // 기존 interval 정리
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+    }
 
-    const interval = setInterval(() => {
+    setIsProcessing(true);
+    setIsPaused(false);
+    setCurrentIndex(0);
+    setPreviousDefectStates({}); // 새로운 백테스팅 시작 시 불량 상태 초기화
+
+    intervalRef.current = setInterval(() => {
       setCurrentIndex((prev) => {
         const next = prev + 1;
         if (next >= modelResults.phase_angle_data.length) {
-          clearInterval(interval);
+          if (intervalRef.current) {
+            clearInterval(intervalRef.current);
+            intervalRef.current = null;
+          }
           setIsProcessing(false);
           return prev;
         }
 
-        // 불량 예측 감지는 useEffect에서 처리
-
         return next;
       });
-    }, 100); // 100ms마다 다음 데이터 포인트로 이동
+    }, 150); // 150ms마다 다음 데이터 포인트로 이동 (메모리 부하 감소)
   }, [modelResults, isProcessing]);
 
+  const pauseResumeSimulation = useCallback(() => {
+    if (!isProcessing) return;
+
+    if (isPaused) {
+      // 재개
+      setIsPaused(false);
+      if (!intervalRef.current && modelResults) {
+        intervalRef.current = setInterval(() => {
+          setCurrentIndex((prev) => {
+            const next = prev + 1;
+            if (next >= modelResults.phase_angle_data.length) {
+              if (intervalRef.current) {
+                clearInterval(intervalRef.current);
+                intervalRef.current = null;
+              }
+              setIsProcessing(false);
+              return prev;
+            }
+            return next;
+          });
+        }, 150);
+      }
+    } else {
+      // 일시정지
+      setIsPaused(true);
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    }
+  }, [isPaused, isProcessing, modelResults]);
+
   const stopRealTimeSimulation = useCallback(() => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
     setIsProcessing(false);
+    setIsPaused(false);
+
+    // 메모리 최적화: 중간 데이터 정리
+    setPreviousDefectStates({});
+
+    // 필요시 가비지 컬렉션 힌트
+    if (typeof window !== "undefined" && (window as any).gc) {
+      setTimeout(() => {
+        try {
+          (window as any).gc();
+        } catch (e) {
+          // 가비지 컬렉션이 지원되지 않는 경우 무시
+        }
+      }, 100);
+    }
   }, []);
 
   const resetSimulation = useCallback(() => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
     setCurrentIndex(0);
     setIsProcessing(false);
+    setIsPaused(false);
     setPreviousDefectStates({}); // 불량 상태 초기화
+  }, []);
+
+  // 컴포넌트 언마운트 시 메모리 정리
+  useEffect(() => {
+    return () => {
+      // interval 정리
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+
+      // 메모리 정리 - 큰 데이터 객체들 해제
+      setModelResults(null);
+      setPreviousDefectStates({});
+
+      // 강제 가비지 컬렉션 (가능한 경우)
+      if ((window as any).gc) {
+        try {
+          (window as any).gc();
+        } catch (e) {
+          // 가비지 컬렉션이 지원되지 않는 경우 무시
+        }
+      }
+    };
   }, []);
 
   // 모델 목록 업데이트
@@ -278,30 +391,42 @@ const BacktestingPanel: React.FC = () => {
 
   const { showToast } = useToast();
 
-  // 이상치 감지 및 조정 함수
+  // 메모리 최적화된 이상치 감지 및 조정 함수
   const detectAndAdjustOutliers = useCallback(
     (values: number[], referenceValue: number) => {
       if (values.length === 0) return [];
 
-      // IQR 방법으로 이상치 감지
-      const sorted = values
-        .filter((v) => v !== null && v !== undefined && !isNaN(v))
-        .sort((a, b) => a - b);
-      if (sorted.length === 0)
-        return values.map((v) => ({
-          value: v,
-          isOutlier: false,
-          originalValue: v,
-        }));
+      // 메모리 효율적인 IQR 계산 - 중간 배열 생성 최소화
+      const validValues = [];
+      for (let i = 0; i < values.length; i++) {
+        const v = values[i];
+        if (v !== null && v !== undefined && !isNaN(v)) {
+          validValues.push(v);
+        }
+      }
 
-      const q1 = sorted[Math.floor(sorted.length * 0.25)];
-      const q3 = sorted[Math.floor(sorted.length * 0.75)];
+      if (validValues.length === 0) {
+        // 메모리 효율적인 결과 객체 생성
+        const result = new Array(values.length);
+        for (let i = 0; i < values.length; i++) {
+          result[i] = {
+            value: values[i],
+            isOutlier: false,
+            originalValue: values[i],
+          };
+        }
+        return result;
+      }
+
+      validValues.sort((a, b) => a - b);
+      const q1 = validValues[Math.floor(validValues.length * 0.25)];
+      const q3 = validValues[Math.floor(validValues.length * 0.75)];
       const iqr = q3 - q1;
       const lowerBound = q1 - 1.5 * iqr;
       const upperBound = q3 + 1.5 * iqr;
 
       // 기준값 기반 추가 조정
-      const tolerance = Math.abs(referenceValue) * 0.5; // 기준값의 50% 허용
+      const tolerance = Math.abs(referenceValue) * 0.5;
       const adjustedLowerBound = Math.max(
         lowerBound,
         referenceValue - tolerance
@@ -311,47 +436,62 @@ const BacktestingPanel: React.FC = () => {
         referenceValue + tolerance
       );
 
-      return values.map((value) => {
+      // 메모리 효율적인 결과 생성
+      const result = new Array(values.length);
+      for (let i = 0; i < values.length; i++) {
+        const value = values[i];
         if (value === null || value === undefined || isNaN(value)) {
-          return {
-            value: referenceValue,
+          result[i] = {
+            value: null,
             isOutlier: false,
             originalValue: value,
           };
+        } else {
+          const isOutlier =
+            value < adjustedLowerBound || value > adjustedUpperBound;
+          result[i] = {
+            value: isOutlier
+              ? Math.max(
+                  adjustedLowerBound,
+                  Math.min(adjustedUpperBound, value)
+                )
+              : value,
+            isOutlier,
+            originalValue: value,
+          };
         }
-
-        const isOutlier =
-          value < adjustedLowerBound || value > adjustedUpperBound;
-        const adjustedValue = isOutlier
-          ? Math.max(adjustedLowerBound, Math.min(adjustedUpperBound, value))
-          : value;
-
-        return {
-          value: adjustedValue,
-          isOutlier,
-          originalValue: value,
-        };
-      });
+      }
+      return result;
     },
     []
   );
 
-  // 차트 데이터 준비 (메모이제이션 적용)
+  // 차트 데이터 준비 (메모리 최적화된 메모이제이션)
   const chartData = useMemo(() => {
-    if (!modelResults) return { lineData: [], barData: [], currentData: null };
+    if (!modelResults)
+      return {
+        lineData: [],
+        barData: [],
+        currentData: null,
+        angleChartsData: [],
+      };
 
-    // 최대 60개 데이터로 제한 (슬라이딩 윈도우)
+    // 최대 60개 데이터로 제한 (메모리 최적화를 위해 더 작은 윈도우)
     const maxDataPoints = 60;
-    const startIndex = Math.max(0, currentIndex + 1 - maxDataPoints);
+    // 실시간 슬라이딩 윈도우: 현재 인덱스 기준으로 최신 60개 데이터만 표시
+    const endIndex = currentIndex + 1;
+    const startIndex = Math.max(0, endIndex - maxDataPoints);
+
+    // 메모리 최적화: 필요한 데이터만 추출하여 새 객체 생성 방지
     const visibleData = modelResults.phase_angle_data.slice(
       startIndex,
-      currentIndex + 1
+      endIndex
     );
 
     const lineData = visibleData.map((item, index) => {
       try {
         return {
-          index: index + 1,
+          index: index + 1, // 상대적 인덱스 (1부터 120까지)
           timestamp: item.timestamp
             ? new Date(item.timestamp).toLocaleTimeString()
             : `Point ${index + 1}`,
@@ -380,7 +520,7 @@ const BacktestingPanel: React.FC = () => {
             typeof item.ppm_slope === "number"
           ) {
             return {
-              index: index + 1,
+              index: index + 1, // 상대적 인덱스 (1부터 60까지)
               timestamp: item.timestamp
                 ? new Date(item.timestamp).toLocaleTimeString()
                 : `Point ${index + 1}`,
@@ -454,15 +594,16 @@ const BacktestingPanel: React.FC = () => {
       return {
         ...angleInfo,
         data: visibleData.map((item, index) => {
-          const originalValue =
-            Number(item[angleInfo.key as keyof PhaseAngleData]) ||
-            angleInfo.referenceValue;
+          const originalValue = Number(
+            item[angleInfo.key as keyof PhaseAngleData]
+          );
           const adjustedData = adjustedValues[index];
           const value = adjustedData.value;
 
           const tolerance = 2.5;
-          const deviation = Math.abs(value - angleInfo.referenceValue);
-          const deviationRatio = deviation / tolerance;
+          const deviation =
+            value !== null ? Math.abs(value - angleInfo.referenceValue) : 0;
+          const deviationRatio = value !== null ? deviation / tolerance : 0;
           let defectRate = 0;
 
           if (deviationRatio <= 0.5) {
@@ -478,11 +619,11 @@ const BacktestingPanel: React.FC = () => {
           }
 
           return {
-            index: startIndex + index + 1, // 실제 인덱스 반영
+            index: index + 1, // 상대적 인덱스 (1부터 60까지)
             timestamp: item.timestamp
               ? new Date(item.timestamp).toLocaleTimeString()
-              : `Point ${startIndex + index + 1}`,
-            value: value,
+              : `Point ${index + 1}`,
+            value: value !== null && !isNaN(value) ? value : null,
             defectRate: Math.round(defectRate * 10) / 10,
             referenceValue: angleInfo.referenceValue,
             isOutlier: adjustedData.isOutlier,
@@ -494,6 +635,17 @@ const BacktestingPanel: React.FC = () => {
 
     // 현재 데이터는 전체 배열에서 가져오기
     const currentData = modelResults.phase_angle_data[currentIndex] || null;
+
+    // 디버깅 로그
+    if (angleChartsData.length > 0 && angleChartsData[0].data.length > 0) {
+      console.log("차트 데이터 샘플:", {
+        totalCharts: angleChartsData.length,
+        firstChartDataLength: angleChartsData[0].data.length,
+        firstDataPoint: angleChartsData[0].data[0],
+        lastDataPoint:
+          angleChartsData[0].data[angleChartsData[0].data.length - 1],
+      });
+    }
 
     return { lineData, barData, currentData, angleChartsData };
   }, [modelResults, currentIndex, detectAndAdjustOutliers]);
@@ -886,23 +1038,33 @@ const BacktestingPanel: React.FC = () => {
           style={{
             padding: "12px 24px",
             background: modelBacktestMutation.isPending
-              ? "#2a2a2a"
-              : "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-            color: "#fff",
-            border: "1px solid rgba(255, 255, 255, 0.1)",
+              ? MODERN_COLORS.darker
+              : !modelParameters.model_name
+              ? MODERN_COLORS.dark
+              : MODERN_COLORS.background,
+            color: MODERN_COLORS.text,
+            border: `1px solid ${MODERN_COLORS.border}`,
             borderRadius: "8px",
-            cursor: modelBacktestMutation.isPending ? "not-allowed" : "pointer",
+            cursor:
+              modelBacktestMutation.isPending || !modelParameters.model_name
+                ? "not-allowed"
+                : "pointer",
             fontSize: "14px",
             fontWeight: "500",
             transition: "all 0.3s ease",
-            boxShadow: modelBacktestMutation.isPending
-              ? "none"
-              : "0 4px 15px rgba(102, 126, 234, 0.4)",
+            boxShadow: "none",
           }}
+          title={
+            !modelParameters.model_name
+              ? "Select a model first to load data"
+              : modelBacktestMutation.isPending
+              ? "Loading and processing model data..."
+              : "Load historical data for the selected model and run analysis"
+          }
         >
           {modelBacktestMutation.isPending
-            ? "↻ Loading Data..."
-            : "↻ Load Model Data"}
+            ? "● Loading Data..."
+            : "⚡ Load Model Data"}
         </button>
 
         {modelResults && (
@@ -913,21 +1075,52 @@ const BacktestingPanel: React.FC = () => {
               style={{
                 padding: "12px 24px",
                 background: isProcessing
-                  ? "#2a2a2a"
-                  : "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                color: "#fff",
-                border: "1px solid rgba(255, 255, 255, 0.1)",
+                  ? MODERN_COLORS.darker
+                  : MODERN_COLORS.background,
+                color: MODERN_COLORS.text,
+                border: `1px solid ${MODERN_COLORS.border}`,
                 borderRadius: "8px",
                 cursor: isProcessing ? "not-allowed" : "pointer",
                 fontSize: "14px",
                 fontWeight: "500",
                 transition: "all 0.3s ease",
-                boxShadow: isProcessing
-                  ? "none"
-                  : "0 4px 15px rgba(102, 126, 234, 0.4)",
+                boxShadow: "none",
               }}
+              title={
+                isProcessing
+                  ? "Simulation already running"
+                  : "Start real-time simulation of backtest results"
+              }
             >
-              ▷ Start Simulation
+              ▶ Start Simulation
+            </button>
+
+            <button
+              onClick={pauseResumeSimulation}
+              disabled={!isProcessing}
+              style={{
+                padding: "12px 24px",
+                background: !isProcessing
+                  ? MODERN_COLORS.darker
+                  : MODERN_COLORS.background,
+                color: MODERN_COLORS.text,
+                border: `1px solid ${MODERN_COLORS.border}`,
+                borderRadius: "8px",
+                cursor: !isProcessing ? "not-allowed" : "pointer",
+                fontSize: "14px",
+                fontWeight: "500",
+                transition: "all 0.3s ease",
+                boxShadow: "none",
+              }}
+              title={
+                isProcessing
+                  ? isPaused
+                    ? "Resume simulation from current position"
+                    : "Pause simulation temporarily"
+                  : "Start simulation first to enable pause/resume"
+              }
+            >
+              {isPaused ? "▶ Resume" : "⏸ Pause"}
             </button>
 
             <button
@@ -936,56 +1129,77 @@ const BacktestingPanel: React.FC = () => {
               style={{
                 padding: "12px 24px",
                 background: !isProcessing
-                  ? "#2a2a2a"
-                  : "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)",
-                color: "#fff",
-                border: "1px solid rgba(255, 255, 255, 0.1)",
+                  ? MODERN_COLORS.darker
+                  : MODERN_COLORS.background,
+                color: MODERN_COLORS.text,
+                border: `1px solid ${MODERN_COLORS.border}`,
                 borderRadius: "8px",
                 cursor: !isProcessing ? "not-allowed" : "pointer",
                 fontSize: "14px",
                 fontWeight: "500",
                 transition: "all 0.3s ease",
-                boxShadow: !isProcessing
-                  ? "none"
-                  : "0 4px 15px rgba(240, 147, 251, 0.4)",
+                boxShadow: "none",
               }}
+              title={
+                isProcessing
+                  ? "Stop simulation completely"
+                  : "No simulation running"
+              }
             >
-              ⏸ Pause
+              ■ Stop
             </button>
 
             <button
               onClick={resetSimulation}
               style={{
                 padding: "12px 24px",
-                background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                color: "#fff",
-                border: "1px solid rgba(255, 255, 255, 0.1)",
+                background: MODERN_COLORS.background,
+                color: MODERN_COLORS.text,
+                border: `1px solid ${MODERN_COLORS.border}`,
                 borderRadius: "8px",
                 cursor: "pointer",
                 fontSize: "14px",
                 fontWeight: "500",
                 transition: "all 0.3s ease",
-                boxShadow: "0 4px 15px rgba(102, 126, 234, 0.4)",
+                boxShadow: "none",
               }}
+              title="Reset simulation to beginning and clear all progress"
             >
-              ↺ Reset
+              ↻ Reset
             </button>
 
             {/* 진행률 표시 */}
             <div
               style={{
                 display: "flex",
-                alignItems: "center",
+                flexDirection: "column",
                 marginLeft: "20px",
                 color: "#ccc",
                 fontSize: "14px",
+                gap: "4px",
               }}
             >
-              Progress: {currentIndex + 1} / {modelResults.processed_records}(
-              {Math.round(
-                ((currentIndex + 1) / modelResults.processed_records) * 100
-              )}
-              %)
+              <div>
+                Progress: {currentIndex + 1} / {modelResults.processed_records}{" "}
+                (
+                {Math.round(
+                  ((currentIndex + 1) / modelResults.processed_records) * 100
+                )}
+                %)
+              </div>
+              <div style={{ fontSize: "12px", color: "#999" }}>
+                Chart Range: Latest {Math.min(currentIndex + 1, 60)} points
+                {typeof performance !== "undefined" &&
+                  (performance as any).memory && (
+                    <span style={{ marginLeft: "10px" }}>
+                      | RAM:{" "}
+                      {Math.round(
+                        (performance as any).memory.usedJSHeapSize / 1024 / 1024
+                      )}
+                      MB
+                    </span>
+                  )}
+              </div>
             </div>
           </>
         )}
@@ -1014,10 +1228,11 @@ const BacktestingPanel: React.FC = () => {
                 gap: "20px",
                 height: "500px",
               }}
+              title="Individual phase angle monitoring charts - each chart shows real-time values, defect rates, and trend analysis for a specific camshaft phase angle"
             >
               {angleChartsData?.map((angleChart, index) => (
                 <PhaseAngleChart
-                  key={`${angleChart.name}-${index}`}
+                  key={`${angleChart.name}-${index}-${currentIndex}-${angleChart.data.length}`}
                   name={angleChart.name}
                   data={angleChart.data}
                   color={angleChart.color}
@@ -1026,10 +1241,16 @@ const BacktestingPanel: React.FC = () => {
             </div>
 
             {/* Mean & PPM 전체 트렌드 */}
-            <OverallTrendChart data={lineData} />
+            <OverallTrendChart
+              key={`overall-trend-${currentIndex}-${lineData.length}`}
+              data={lineData}
+            />
 
             {/* PPM 기울기 바 차트 */}
-            <PPMSlopeChart data={barData} />
+            <PPMSlopeChart
+              key={`ppm-slope-${currentIndex}-${barData.length}`}
+              data={barData}
+            />
           </div>
 
           {/* 우측: 위상각 데이터 & 현재 상태 */}

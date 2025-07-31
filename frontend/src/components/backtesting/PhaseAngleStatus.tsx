@@ -57,9 +57,22 @@ const PhaseAngleStatus: React.FC<PhaseAngleStatusProps> = memo(
             color: "#fff",
             marginBottom: "15px",
             fontSize: "16px",
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
           }}
         >
           ▦ 6 Phase Angles & Status
+          <span
+            style={{
+              fontSize: "12px",
+              color: "#9CA3AF",
+              cursor: "help",
+            }}
+            title="Real-time monitoring of 6 camshaft phase angles with status indicators. Each angle has reference values and tolerance ranges for quality assessment."
+          >
+            ℹ️
+          </span>
         </h3>
 
         {/* 전체 상태 표시 - 프론트엔드에서 계산된 값 사용 */}

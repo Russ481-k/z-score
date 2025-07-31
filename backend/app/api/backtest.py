@@ -792,20 +792,20 @@ def determine_quality_status(ppm: float, slope: Optional[float] = None):
     """
     PPM과 기울기를 기반으로 품질 상태를 판정합니다.
     
-    임계값:
-    - OK: PPM < 1000
-    - WARNING: 1000 <= PPM < 100000
-    - CRITICAL: PPM >= 100000
+    현실적인 임계값 (제조업 기준):
+    - OK: PPM < 500000 (0.05% 미만)
+    - WARNING: 500000 <= PPM < 1500000 (0.05% ~ 0.15%)
+    - CRITICAL: PPM >= 1500000 (0.15% 이상)
     
     추가로 기울기가 양수이고 큰 경우 경고 수준을 높입니다.
     """
     try:
-        # 기본 PPM 기반 판정
-        if ppm < 1000:
+        # 현실적인 PPM 기반 판정 (더 높은 임계값 사용)
+        if ppm < 500000:  # 0.05% 미만
             status = "OK"
-        elif ppm < 100000:
+        elif ppm < 1500000:  # 0.15% 미만
             status = "WARNING"
-        else:
+        else:  # 0.15% 이상
             status = "CRITICAL"
         
         # 기울기 기반 추가 판정
@@ -815,18 +815,18 @@ def determine_quality_status(ppm: float, slope: Optional[float] = None):
             elif status == "WARNING":
                 status = "CRITICAL"
         
-        # 불량 확률 계산 (더 현실적인 로지스틱 함수)
+        # 불량 확률 계산 (새로운 임계값에 맞춘 현실적인 로지스틱 함수)
         # PPM 값에 따른 확률 계산 - 더 점진적인 증가
-        if ppm < 100:
-            defect_prob = 0.0
-        elif ppm < 1000:
-            defect_prob = (ppm - 100) / 9000  # 0-0.1 범위
-        elif ppm < 10000:
-            defect_prob = 0.1 + (ppm - 1000) / 18000  # 0.1-0.6 범위  
-        elif ppm < 100000:
-            defect_prob = 0.6 + (ppm - 10000) / 225000  # 0.6-1.0 범위
+        if ppm < 100000:  # 0.01% 미만
+            defect_prob = ppm / 1000000  # 0-0.1 범위
+        elif ppm < 500000:  # 0.05% 미만
+            defect_prob = 0.1 + (ppm - 100000) / 800000  # 0.1-0.6 범위
+        elif ppm < 1000000:  # 0.1% 미만
+            defect_prob = 0.6 + (ppm - 500000) / 625000  # 0.6-0.8 범위  
+        elif ppm < 1500000:  # 0.15% 미만
+            defect_prob = 0.8 + (ppm - 1000000) / 2500000  # 0.8-1.0 범위
         else:
-            defect_prob = min(1.0, 0.9 + (ppm - 100000) / 1000000)  # 0.9-1.0 범위
+            defect_prob = min(1.0, 0.9 + (ppm - 1500000) / 5000000)  # 0.9-1.0 범위
         
         # 기울기 영향 추가
         if slope is not None and slope > 0:

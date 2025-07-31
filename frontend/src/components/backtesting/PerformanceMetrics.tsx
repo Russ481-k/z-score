@@ -77,26 +77,107 @@ const PerformanceMetrics: React.FC<PerformanceMetricsProps> = memo(
             color: "#fff",
             marginBottom: "15px",
             fontSize: "16px",
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
           }}
         >
           ▦ Performance Metrics
+          <span
+            style={{
+              fontSize: "12px",
+              color: "#9CA3AF",
+              cursor: "help",
+            }}
+            title="Overall performance statistics for the backtesting analysis, including PPM (Parts Per Million defect rate), slope trends, and quality distribution"
+          >
+            ℹ️
+          </span>
         </h3>
         <div style={{ color: "#ccc", fontSize: "13px" }}>
-          <div style={{ marginBottom: "6px" }}>
+          <div
+            style={{
+              marginBottom: "6px",
+              display: "flex",
+              alignItems: "center",
+              gap: "4px",
+            }}
+          >
             <strong>Avg PPM:</strong>{" "}
             {modelResults.performance_metrics.avg_ppm.toFixed(2)}
+            <span
+              style={{
+                fontSize: "10px",
+                color: "#9CA3AF",
+                cursor: "help",
+              }}
+              title="Average Parts Per Million defect rate across all analyzed data points"
+            >
+              ℹ️
+            </span>
           </div>
-          <div style={{ marginBottom: "6px" }}>
+          <div
+            style={{
+              marginBottom: "6px",
+              display: "flex",
+              alignItems: "center",
+              gap: "4px",
+            }}
+          >
             <strong>Max PPM:</strong>{" "}
             {modelResults.performance_metrics.max_ppm.toFixed(2)}
+            <span
+              style={{
+                fontSize: "10px",
+                color: "#9CA3AF",
+                cursor: "help",
+              }}
+              title="Highest PPM value detected in the dataset - indicates worst quality period"
+            >
+              ℹ️
+            </span>
           </div>
-          <div style={{ marginBottom: "6px" }}>
+          <div
+            style={{
+              marginBottom: "6px",
+              display: "flex",
+              alignItems: "center",
+              gap: "4px",
+            }}
+          >
             <strong>Min PPM:</strong>{" "}
             {modelResults.performance_metrics.min_ppm.toFixed(2)}
+            <span
+              style={{
+                fontSize: "10px",
+                color: "#9CA3AF",
+                cursor: "help",
+              }}
+              title="Lowest PPM value detected in the dataset - indicates best quality period"
+            >
+              ℹ️
+            </span>
           </div>
-          <div style={{ marginBottom: "6px" }}>
+          <div
+            style={{
+              marginBottom: "6px",
+              display: "flex",
+              alignItems: "center",
+              gap: "4px",
+            }}
+          >
             <strong>Avg Slope:</strong>{" "}
             {modelResults.performance_metrics.avg_slope.toFixed(4)}
+            <span
+              style={{
+                fontSize: "10px",
+                color: "#9CA3AF",
+                cursor: "help",
+              }}
+              title="Average slope of PPM trend - positive values indicate deteriorating quality, negative values indicate improving quality"
+            >
+              ℹ️
+            </span>
           </div>
 
           {/* 품질 상태 분포 */}
@@ -112,9 +193,22 @@ const PerformanceMetrics: React.FC<PerformanceMetricsProps> = memo(
                 marginBottom: "4px",
                 fontSize: "12px",
                 fontWeight: "bold",
+                display: "flex",
+                alignItems: "center",
+                gap: "4px",
               }}
             >
               Quality Distribution:
+              <span
+                style={{
+                  fontSize: "10px",
+                  color: "#9CA3AF",
+                  cursor: "help",
+                }}
+                title="Distribution of quality statuses across all data points: OK (normal), WARNING (attention needed), CRITICAL (immediate action required)"
+              >
+                ℹ️
+              </span>
             </div>
             {(() => {
               const statusCounts = modelResults.phase_angle_data.reduce(
