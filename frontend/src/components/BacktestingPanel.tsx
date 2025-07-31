@@ -93,7 +93,7 @@ const BacktestingPanel: React.FC = () => {
       window_size: 50,
       z_threshold: 2.0,
       prediction_horizon: 10,
-      max_records: 500,
+      max_records: 200,
     });
 
   const [modelResults, setModelResults] = useState<ModelBacktestResult | null>(
@@ -202,7 +202,7 @@ const BacktestingPanel: React.FC = () => {
         });
 
         showToast(
-          `백테스팅 완료! ${data.processed_records}개의 데이터 포인트를 처리했습니다.`,
+          `${data.processed_records}개의 데이터 포인트를 처리했습니다.`,
           "success"
         );
       } catch (error: any) {
@@ -236,24 +236,21 @@ const BacktestingPanel: React.FC = () => {
       return;
     }
 
-    if (
-      modelParameters.window_size < 10 ||
-      modelParameters.window_size > 1000
-    ) {
-      showToast("윈도우 크기는 10~1000 사이여야 합니다.", "warning");
-      return;
-    }
-
-    if (modelParameters.z_threshold < 0.1 || modelParameters.z_threshold > 10) {
-      showToast("Z-Threshold는 0.1~10 사이여야 합니다.", "warning");
+    if (modelParameters.window_size < 10 || modelParameters.window_size > 100) {
+      showToast("윈도우 크기는 10~100 사이여야 합니다.", "warning");
       return;
     }
 
     if (
-      modelParameters.max_records < 100 ||
-      modelParameters.max_records > 5000
+      modelParameters.z_threshold < 0.5 ||
+      modelParameters.z_threshold > 5.0
     ) {
-      showToast("최대 레코드 수는 100~5000 사이여야 합니다.", "warning");
+      showToast("Z-Threshold는 0.5~5.0 사이여야 합니다.", "warning");
+      return;
+    }
+
+    if (modelParameters.max_records < 50 || modelParameters.max_records > 200) {
+      showToast("최대 레코드 수는 50~200 사이여야 합니다.", "warning");
       return;
     }
 
@@ -795,7 +792,7 @@ const BacktestingPanel: React.FC = () => {
             riskLevel = "모니터링 강화";
           }
 
-          const message = `⚠ ${modelName} | ${angle.name} (${angle.column})
+          const message = `${modelName} | ${angle.name} (${angle.column})
 불량률: ${defectRisk.toFixed(1)}% | ${severityText}
 기준값: ${status.referenceValue} | 편차: ±${status.deviation} | ${riskLevel}`;
 
@@ -948,6 +945,8 @@ const BacktestingPanel: React.FC = () => {
           </label>
           <input
             type="number"
+            min="10"
+            max="100"
             value={modelParameters.window_size}
             onChange={(e) =>
               handleModelParameterChange(
@@ -975,6 +974,8 @@ const BacktestingPanel: React.FC = () => {
           <input
             type="number"
             step="0.1"
+            min="0.5"
+            max="5.0"
             value={modelParameters.z_threshold}
             onChange={(e) =>
               handleModelParameterChange(
@@ -1001,6 +1002,8 @@ const BacktestingPanel: React.FC = () => {
           </label>
           <input
             type="number"
+            min="50"
+            max="200"
             value={modelParameters.max_records}
             onChange={(e) =>
               handleModelParameterChange(
