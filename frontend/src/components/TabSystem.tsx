@@ -60,9 +60,8 @@ const TabSystem = () => {
           .tab-nav {
             display: flex;
             gap: 0;
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 4px 12px;
+            width: 100%;
+            padding: 4px 20px;
           }
 
           .tab-button {
@@ -72,15 +71,15 @@ const TabSystem = () => {
           }
 
           .tab-content {
-            margin: 0 12px;
+            margin: 0;
             margin-top: 12px;
             border-radius: 12px 12px 0 0;
+            width: 100%;
           }
 
           .tab-content-inner {
-            padding: 16px;
-            max-width: 1200px;
-            margin: 0 auto;
+            padding: 16px 20px;
+            width: 100%;
           }
 
           .tab-button {
@@ -116,7 +115,8 @@ const TabSystem = () => {
           @media (max-width: 768px) {
             .tab-nav {
               flex-wrap: wrap;
-              padding: 4px 12px;
+              padding: 4px 16px;
+              width: 100%;
             }
 
             .tab-button {
@@ -126,13 +126,15 @@ const TabSystem = () => {
             }
 
             .tab-content {
-              margin: 0 12px;
+              margin: 0;
               margin-top: 12px;
               border-radius: 12px 12px 0 0;
+              width: 100%;
             }
 
             .tab-content-inner {
               padding: 16px;
+              width: 100%;
             }
           }
         `}</style>
