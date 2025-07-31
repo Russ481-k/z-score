@@ -162,7 +162,9 @@ const DashboardView: React.FC = () => {
           height: "60px",
         }}
       >
-        <h2 style={{ color: "#fff", margin: 0 }}>실시간 모니터링 대시보드</h2>
+        <h2 style={{ color: "#fff", margin: 0 }}>
+          Real-time Monitoring Dashboard
+        </h2>
         <span
           style={{
             padding: "5px 10px",

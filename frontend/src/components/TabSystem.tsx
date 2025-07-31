@@ -13,16 +13,16 @@ const TabSystem = () => {
   const [activeTab, setActiveTab] = useState<Tab>("dashboard");
 
   const tabs = [
-    { id: "dashboard" as Tab, label: "▦ 대시보드", component: DashboardView },
-    { id: "raw-data" as Tab, label: "▤ 로우 데이터", component: RawDataGrid },
+    { id: "dashboard" as Tab, label: "▦ Dashboard", component: DashboardView },
+    { id: "raw-data" as Tab, label: "▤ Raw Data", component: RawDataGrid },
     {
       id: "column-mapper" as Tab,
-      label: "⚙ 컬럼 매퍼",
+      label: "⚙ Column Mapper",
       component: ColumnMapperGrid,
     },
     {
       id: "backtesting" as Tab,
-      label: "⟲ 백테스팅",
+      label: "⟲ Backtesting",
       component: BacktestingPanel,
     },
   ];

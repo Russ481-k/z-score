@@ -97,7 +97,7 @@ const RawDataGrid: React.FC = () => {
         setHasMore(data.has_more);
         setCurrentPage(page);
 
-        console.log("데이터 로드 성공:", {
+        console.log("Data loaded:", {
           page,
           itemsCount: data.items.length,
           totalItems:
@@ -105,7 +105,7 @@ const RawDataGrid: React.FC = () => {
           hasMore: data.has_more,
         });
       } catch (error: any) {
-        console.error("데이터 로드 실패:", error);
+        console.error("Data load failed:", error);
       } finally {
         setLoading(false);
         isLoadingRef.current = false;
@@ -120,7 +120,7 @@ const RawDataGrid: React.FC = () => {
   }, []);
 
   const onGridReady = useCallback((params: GridReadyEvent) => {
-    console.log("AG Grid 준비 완료");
+    console.log("AG Grid Ready");
     gridApiRef.current = params.api;
   }, []);
 
@@ -133,7 +133,7 @@ const RawDataGrid: React.FC = () => {
       const lastDisplayedRowIndex = gridApi.getLastDisplayedRowIndex();
       const totalRows = gridApi.getDisplayedRowCount();
 
-      // 마지막에서 10개 행 남았을 때 다음 페이지 로드
+      // Load next page when 10 rows remaining
       if (lastDisplayedRowIndex >= totalRows - 10) {
         loadMoreData(currentPage + 1);
       }
@@ -219,33 +219,31 @@ const RawDataGrid: React.FC = () => {
         }
       `}</style>
 
-      {/* 압축된 헤더 */}
       <div className="compact-header">
         <div className="header-left">
-          <h1 className="title">매핑된 로우 데이터 (AG Grid 무한스크롤)</h1>
+          <h1 className="title">Raw Data (AG Grid Infinite Scroll)</h1>
           <div className="stats">
-            <span className="stat">🚀 AG Grid 스크롤 로딩</span>
+            <span className="stat">↻ Scroll Loading</span>
             <span className="stat">
-              ⚡ 현재 {rowData.length.toLocaleString()}개 로드됨
+              ▲ Loaded {rowData.length.toLocaleString()} items
             </span>
             <span className="stat">
-              🔄 동적 컬럼 {Object.keys(columnMapping).length}개
+              ≡ {Object.keys(columnMapping).length} columns
             </span>
             {totalCount && (
               <span className="stat">
-                📊 총 {totalCount.toLocaleString()}개
+                ∑ Total {totalCount.toLocaleString()} items
               </span>
             )}
-            {loading && <span className="stat">⏳ 로딩 중...</span>}
+            {loading && <span className="stat">⟳ Loading...</span>}
           </div>
         </div>
       </div>
 
-      {/* AG Grid 영역 */}
       <div className="grid-container" style={{ position: "relative" }}>
         {loading && (
           <div className="loading-overlay">
-            <div>데이터 로딩 중...</div>
+            <div>Loading data...</div>
           </div>
         )}
         <div

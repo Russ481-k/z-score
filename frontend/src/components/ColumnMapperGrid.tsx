@@ -351,26 +351,26 @@ const ColumnMapperGrid: React.FC = () => {
       },
       {
         field: "raw_column_name",
-        headerName: "원본 컬럼명",
+        headerName: "Raw Column",
         width: 150,
         cellRenderer: EditableCellRenderer,
       },
       {
         field: "mapped_column_name",
-        headerName: "매핑된 컬럼명",
+        headerName: "Mapped Column",
         width: 200,
         cellRenderer: EditableCellRenderer,
       },
       {
         flex: 1,
         field: "description",
-        headerName: "설명",
+        headerName: "Description",
         width: 200,
         cellRenderer: EditableCellRenderer,
       },
 
       {
-        headerName: "액션",
+        headerName: "Actions",
         width: 120,
         cellRenderer: ActionCellRenderer,
         sortable: false,
@@ -382,7 +382,10 @@ const ColumnMapperGrid: React.FC = () => {
 
   const handleAddMapper = () => {
     if (!newMapper.raw_column_name || !newMapper.mapped_column_name) {
-      showToast("원본 컬럼명과 매핑된 컬럼명을 입력해주세요.", "warning");
+      showToast(
+        "Please enter both raw column name and mapped column name.",
+        "warning"
+      );
       return;
     }
     createMutation.mutate(newMapper);
@@ -390,7 +393,7 @@ const ColumnMapperGrid: React.FC = () => {
 
   const handleInitializeAll = () => {
     const isConfirmed = window.confirm(
-      "전체 컬럼(d000~d149)을 초기화하시겠습니까? 기존 데이터는 모두 삭제됩니다."
+      "Initialize all columns (d000~d149)? All existing data will be deleted."
     );
     if (isConfirmed) {
       initializeAllMutation.mutate();
@@ -401,14 +404,14 @@ const ColumnMapperGrid: React.FC = () => {
     return (
       <div className="loading-container">
         <div className="loading-spinner"></div>
-        <span>컬럼 매퍼를 불러오는 중...</span>
+        <span>Loading column mappers...</span>
       </div>
     );
 
   if (error)
     return (
       <div className="error-container">
-        <span>⚠ 데이터를 불러오는 중 오류가 발생했습니다.</span>
+        <span>⚠ Error occurred while loading data.</span>
       </div>
     );
 
@@ -717,7 +720,7 @@ const ColumnMapperGrid: React.FC = () => {
 
       <div className="header-card">
         <div className="header-top">
-          <h1 className="header-title">컬럼 매퍼 관리</h1>
+          <h1 className="header-title">Column Mapper Management</h1>
           <div className="header-controls">
             <button
               onClick={handleInitializeAll}
@@ -726,38 +729,36 @@ const ColumnMapperGrid: React.FC = () => {
             >
               ↻{" "}
               {initializeAllMutation.isPending
-                ? "초기화 중..."
-                : "전체 컬럼 초기화"}
+                ? "Initializing..."
+                : "Initialize All Columns"}
             </button>
             <button
               onClick={() => setIsAddMode(!isAddMode)}
               className="modern-btn primary-btn"
             >
-              {isAddMode ? "✕ 취소" : "+ 새 매핑 추가"}
+              {isAddMode ? "✕ Cancel" : "+ Add New Mapping"}
             </button>
           </div>
         </div>
         <div className="header-stats">
           <div className="stat-item">
             <span>▤</span>
-            <span>총 {data?.total || 0}개의 컬럼 매핑</span>
+            <span>Total {data?.total || 0} mappings</span>
           </div>
           <div className="stat-item">
             <span>●</span>
             <span>
-              활성화된 컬럼:{" "}
+              Active:{" "}
               {data?.items?.filter((item: ColumnMapper) => item.is_active)
                 .length || 0}
-              개
             </span>
           </div>
           <div className="stat-item">
             <span>○</span>
             <span>
-              비활성화된 컬럼:{" "}
+              Inactive:{" "}
               {data?.items?.filter((item: ColumnMapper) => !item.is_active)
                 .length || 0}
-              개
             </span>
           </div>
         </div>
@@ -765,11 +766,11 @@ const ColumnMapperGrid: React.FC = () => {
 
       {isAddMode && (
         <div className="add-form-card">
-          <h3 className="form-title">새 컬럼 매핑 추가</h3>
+          <h3 className="form-title">Add New Column Mapping</h3>
           <div className="form-grid">
             <input
               type="text"
-              placeholder="원본 컬럼명 (예: d001)"
+              placeholder="Raw column name (e.g: d001)"
               value={newMapper.raw_column_name}
               onChange={(e) =>
                 setNewMapper({ ...newMapper, raw_column_name: e.target.value })
@@ -778,7 +779,7 @@ const ColumnMapperGrid: React.FC = () => {
             />
             <input
               type="text"
-              placeholder="매핑된 컬럼명"
+              placeholder="Mapped column name"
               value={newMapper.mapped_column_name}
               onChange={(e) =>
                 setNewMapper({
@@ -790,7 +791,7 @@ const ColumnMapperGrid: React.FC = () => {
             />
             <input
               type="text"
-              placeholder="설명 (선택사항)"
+              placeholder="Description (optional)"
               value={newMapper.description || ""}
               onChange={(e) =>
                 setNewMapper({ ...newMapper, description: e.target.value })
@@ -799,7 +800,7 @@ const ColumnMapperGrid: React.FC = () => {
             />
             <input
               type="number"
-              placeholder="표시순서"
+              placeholder="Display order"
               value={newMapper.display_order}
               onChange={(e) =>
                 setNewMapper({
@@ -819,7 +820,7 @@ const ColumnMapperGrid: React.FC = () => {
                   }
                   style={{ marginRight: "6px" }}
                 />
-                활성화
+                Active
               </label>
             </div>
           </div>
@@ -828,7 +829,7 @@ const ColumnMapperGrid: React.FC = () => {
             disabled={createMutation.isPending}
             className="modern-btn primary-btn"
           >
-            {createMutation.isPending ? "추가 중..." : "+ 추가"}
+            {createMutation.isPending ? "Adding..." : "+ Add"}
           </button>
         </div>
       )}
