@@ -1,0 +1,34 @@
+# docker-compose.prod.yml - Simple POC configuration
+version: '3.8'
+
+services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: runner
+    container_name: zscore-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+      target: production
+    container_name: zscore-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - NODE_ENV=development
+      - ORACLE_USER=${ORACLE_USER}
+      - ORACLE_PASSWORD=${ORACLE_PASSWORD}
+      - ORACLE_DSN=${ORACLE_DSN}
+      - ORACLE_DATABASE_URL=${ORACLE_DATABASE_URL}
+    volumes:
+      - ./data:/app/data:ro
+    restart: unless-stopped

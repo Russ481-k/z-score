@@ -1,0 +1,28 @@
+# docker-compose.images.yml - 빌드된 이미지 사용 버전
+version: '3.8'
+
+services:
+  frontend:
+    image: zscore-frontend:latest  # 또는 your-registry/zscore-frontend:latest
+    container_name: zscore-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+    restart: unless-stopped
+
+  backend:
+    image: zscore-backend:latest   # 또는 your-registry/zscore-backend:latest
+    container_name: zscore-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - NODE_ENV=development
+      - ORACLE_USER=${ORACLE_USER}
+      - ORACLE_PASSWORD=${ORACLE_PASSWORD}
+      - ORACLE_DSN=${ORACLE_DSN}
+      - ORACLE_DATABASE_URL=${ORACLE_DATABASE_URL}
+    volumes:
+      - ./data:/app/data:ro
+    restart: unless-stopped
